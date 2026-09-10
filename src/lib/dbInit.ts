@@ -48,6 +48,18 @@ export async function ensureSchema(): Promise<void> {
     return;
   }
 
+  // The database may still be accepting connections a moment after the
+  // container reports healthy, so retry the first query briefly.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await prisma.$queryRawUnsafe("SELECT 1");
+      break;
+    } catch (err) {
+      if (attempt >= 10) throw err;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+
   await prisma.$executeRawUnsafe(
     "CREATE TABLE IF NOT EXISTS app_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());",
   );
