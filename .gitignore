@@ -1,0 +1,22 @@
+node_modules
+.next
+out
+build
+next-env.d.ts
+
+.env
+.env*.local
+
+npm-debug.log*
+yarn-error.log*
+
+coverage
+playwright-report
+test-results
+.pgdata
+
+# run context (never commit)
+result.json
+compose.critique.yml
+CLAUDE.md
+.claude
