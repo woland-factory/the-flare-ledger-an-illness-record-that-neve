@@ -36,7 +36,7 @@ export async function ensureSchema(): Promise<void> {
       "CREATE TABLE IF NOT EXISTS app_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());",
     );
     for (const name of names) {
-      const done = await pg.query<{ name: string }>(
+      const done = await pg.query(
         "SELECT name FROM app_migrations WHERE name = $1",
         [name],
       );
