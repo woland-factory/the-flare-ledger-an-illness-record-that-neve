@@ -6,9 +6,10 @@ question about when it began, so a history of your flares builds up from a few
 taps a month instead of a daily diary. Over time it becomes a doctor-ready
 account of your illness that you correct rather than compose.
 
-This repository is the walking skeleton: sign up, start a flare, set a fuzzy
-onset, and read a minimal ledger. The flare-end interview, the one-page
-pre-appointment timeline, and the guided first run arrive in later milestones.
+Today you can sign up, start a flare, set a fuzzy onset, close it through a
+short end-of-flare interview, and correct any flare after the fact. The
+one-page pre-appointment timeline and the guided first run arrive in later
+milestones.
 
 ## Run it locally
 
@@ -81,9 +82,10 @@ values from the environment.
 - `src/app` holds the screens (React Server Components) and the JSON API under
   `src/app/api`.
 - `src/lib` holds the core modules: auth and sessions, the rate limiter,
-  onset math, validation, serialization, and the demo seed.
+  onset and interview date math, validation, serialization, hedged display
+  text, and the demo seed.
 - `src/components` holds the client components (the flare button, the onset
-  sheet, the auth form).
+  sheet, the end-of-flare interview, the flare editor, and the auth form).
 - `prisma/schema.prisma` and `prisma/migrations` define the database. Schema
   changes are forward-only migrations.
 - `tests` holds the Vitest suites and `e2e` holds the Playwright specs.

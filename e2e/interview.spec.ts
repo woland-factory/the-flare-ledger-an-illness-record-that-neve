@@ -70,6 +70,10 @@ test.describe("flare-end interview", () => {
     await page.goto("/ledger");
     await expect(page.getByText(/Lasted about \d+ days/)).toBeVisible();
     await expect(page.getByText(/Ended around/)).toBeVisible();
+    const ledgerNoOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    );
+    expect(ledgerNoOverflow).toBe(true);
   });
 
   test("the skip-treatments branch closes with zero treatments", async ({ page }) => {
