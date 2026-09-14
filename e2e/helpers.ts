@@ -36,3 +36,12 @@ export async function signup(
 export async function authenticate(page: Page): Promise<void> {
   await signup(page.request);
 }
+
+/** Sign the seeded demo user into the page context. */
+export async function signInDemo(page: Page): Promise<void> {
+  const res = await page.request.post("/api/auth/signin", {
+    data: { email: DEMO_EMAIL, password: DEMO_PASSWORD },
+    headers: { "x-forwarded-for": randomIp() },
+  });
+  expect(res.status()).toBe(200);
+}

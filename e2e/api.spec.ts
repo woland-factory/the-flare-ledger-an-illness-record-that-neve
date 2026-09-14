@@ -135,8 +135,8 @@ test("auth endpoint is rate limited per IP (429)", async ({ playwright }) => {
 test("mutations are rate limited per user (429)", async ({ request }) => {
   await signup(request);
   let status = 0;
-  // Limit is set to 20 for the e2e server.
-  for (let i = 0; i < 21; i++) {
+  // Limit is set to 40 for the e2e server.
+  for (let i = 0; i < 41; i++) {
     status = (await request.post("/api/flares")).status();
   }
   expect(status).toBe(429);

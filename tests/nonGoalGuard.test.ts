@@ -16,6 +16,12 @@ const MECHANICAL: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /\bcron\b/i, label: "cron scheduler" },
   { pattern: /new\s+Notification|Notification\.requestPermission|showNotification/i, label: "scheduled notification" },
   { pattern: /recharts|chart\.js|chartjs|\bd3\b|victory|nivo/i, label: "charting library" },
+  // EPIC 3 boundaries: the ledger is one newest-first list, not a filtering
+  // dashboard, and every read is scoped to the signed-in user.
+  { pattern: /type=["']search["']/i, label: "search input (a filter control)" },
+  { pattern: /\bfacet(ing|s)?\b/i, label: "faceting control" },
+  { pattern: /filter(By|Flares|Controls?)/i, label: "ledger filter control" },
+  { pattern: /share[_-]?token|shareToken|public[_-]?link|clinician[_-]?view/i, label: "cross-user or share read path" },
 ];
 
 // Paradigm markers: a streak, daily check-in, reminder, or trend/correlation
