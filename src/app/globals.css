@@ -376,3 +376,38 @@ textarea.input {
   color: var(--ink-soft);
   margin: 0 0 8px;
 }
+
+/* Printable full record */
+.print-flare {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-flare h2 {
+  margin-bottom: 6px;
+}
+
+.print-flare ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+@media print {
+  .topbar,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+  .container {
+    max-width: none;
+    padding: 0;
+  }
+  .print-flare {
+    border-bottom: 1px solid #cccccc;
+  }
+}

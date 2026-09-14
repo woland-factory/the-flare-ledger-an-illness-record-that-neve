@@ -1,26 +1,30 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import ExportActions from "@/components/ExportActions";
+import FlareRow from "@/components/FlareRow";
 import FlareStarter from "@/components/FlareStarter";
+import LedgerPager from "@/components/LedgerPager";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { durationTextFor, endText, onsetText, statusText } from "@/lib/display";
 import { serializeFlare } from "@/lib/serialize";
 
 export const dynamic = "force-dynamic";
+
+const PAGE = 25;
 
 export default async function LedgerPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/signin");
 
-  const flares = (
-    await prisma.flare.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    })
-  ).map(serializeFlare);
+  // First page server-side for a fast first paint. The extra row only tells us
+  // whether an older page exists; it is not rendered.
+  const rows = await prisma.flare.findMany({
+    where: { userId: user.id },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: PAGE + 1,
+    include: { treatments: true },
+  });
 
-  if (flares.length === 0) {
+  if (rows.length === 0) {
     return (
       <main className="container">
         <div className="card empty">
@@ -32,29 +36,30 @@ export default async function LedgerPage() {
     );
   }
 
+  const hasMore = rows.length > PAGE;
+  const page = (hasMore ? rows.slice(0, PAGE) : rows).map(serializeFlare);
+  const last = page[page.length - 1];
+  const initialCursor =
+    hasMore && last ? `${last.createdAt}_${last.id}` : null;
+
   return (
     <main className="container">
       <h1>Your ledger</h1>
       <p className="lede">Every flare you have logged, newest first.</p>
       <div className="card">
-        {flares.map((flare) => {
-          const duration = durationTextFor(flare);
-          const ended = endText(flare);
-          return (
-            <Link className="flare-row flare-row-link" key={flare.id} href={`/flares/${flare.id}/edit`}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{onsetText(flare)}</div>
-                {duration ? <div className="muted">Lasted {duration}</div> : null}
-                {ended ? <div className="muted">{ended}</div> : null}
-              </div>
-              <span
-                className={`pill ${flare.status === "open" ? "pill-open" : "pill-closed"}`}
-              >
-                {statusText(flare.status)}
-              </span>
-            </Link>
-          );
-        })}
+        {page.map((flare) => (
+          <FlareRow key={flare.id} flare={flare} />
+        ))}
+      </div>
+      {initialCursor ? <LedgerPager initialCursor={initialCursor} /> : null}
+
+      <div className="spacer" />
+      <div className="card">
+        <h2>Export your record</h2>
+        <p className="muted" style={{ marginBottom: 12 }}>
+          Take the whole record to your appointment.
+        </p>
+        <ExportActions />
       </div>
     </main>
   );
