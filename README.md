@@ -7,9 +7,24 @@ taps a month instead of a daily diary. Over time it becomes a doctor-ready
 account of your illness that you correct rather than compose.
 
 Today you can sign up, start a flare, set a fuzzy onset, close it through a
-short end-of-flare interview, and correct any flare after the fact. The
-one-page pre-appointment timeline and the guided first run arrive in later
-milestones.
+short end-of-flare interview, and correct any flare after the fact. The ledger
+lists your whole history, newest first, and each row shows the flare's
+duration, peak severity, and key treatments at a glance. You can carry the
+record out the door three ways: download it as JSON, download it as a
+spreadsheet-ready CSV, or print a clean one-document view. The one-page
+pre-appointment timeline and the guided first run arrive in later milestones.
+
+## The ledger and export
+
+- **Ledger** (`/ledger`): every flare, newest first. The list pages with a
+  "Load older flares" button, so a multi-year record loads a page at a time
+  and stays fast. Tap any row to open and correct that flare.
+- **Export** (`GET /api/export?format=json` or `?format=csv`): the complete
+  record, scoped to you. JSON mirrors the API shape. CSV is one row per
+  treatment, with formula-injection guarded so it opens safely in a
+  spreadsheet.
+- **Print** (`/ledger/print`): the whole record as one clean page with print
+  styling and no app chrome.
 
 ## Run it locally
 
@@ -83,9 +98,10 @@ values from the environment.
   `src/app/api`.
 - `src/lib` holds the core modules: auth and sessions, the rate limiter,
   onset and interview date math, validation, serialization, hedged display
-  text, and the demo seed.
+  text, the CSV and export builders, and the demo seed.
 - `src/components` holds the client components (the flare button, the onset
-  sheet, the end-of-flare interview, the flare editor, and the auth form).
+  sheet, the end-of-flare interview, the flare editor, the ledger pager, and
+  the export actions).
 - `prisma/schema.prisma` and `prisma/migrations` define the database. Schema
   changes are forward-only migrations.
 - `tests` holds the Vitest suites and `e2e` holds the Playwright specs.
