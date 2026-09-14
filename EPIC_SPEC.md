@@ -1,4 +1,4 @@
-# EPIC SPEC — Walking skeleton: the button, onset, and staging deploy
+# EPIC SPEC — Flare-end interview and close
 
 ## Quality differentiator (this EPIC is held to it)
 
@@ -6,426 +6,478 @@
 person than any other route to a doctor-ready illness history, measured in
 minutes per flare instead of entries per day.
 
-**What it demands of THIS EPIC.** The one path this EPIC ships, starting a
-flare, must cost the user the fewest possible taps and zero typing in the
-common case. Pressing "Start a flare" records the flare on the first tap.
-Setting the onset is a second tap for the two common answers ("Today", "A
-few days ago"). Only "Around a date" asks for one date pick. No form, no
-required text, no severity, no login friction beyond email and password.
-Every screen in this EPIC is judged against "did it ask for one gram more
-than it had to?"
+**What it demands of THIS EPIC.** Closing a flare is the second and larger
+of the two moments a user gives the app, so it is where "least effort" is
+won or lost. The interview must be the shortest complete path from "it's
+over" to a recorded flare: one question per step, taps over typing, every
+uncertain answer expressible in a single tap ("a few days ago", "not
+sure"), and every optional field skippable in one tap. A recovering user
+with little energy must finish in well under a minute without reading a
+paragraph or composing prose. Any step that asks for one gram more than the
+record needs is a defect against this differentiator, not just the baseline
+bar.
 
 ---
 
 ## 1. Scope
 
 ### In scope
-- Application scaffold: one deployable web service (mobile-first frontend +
-  JSON API) plus a PostgreSQL database.
-- Email + password auth: sign up, sign in, sign out, server-side sessions.
-- Home screen with exactly one primary action, "Start a flare", plus the
-  current open flare when one exists and a quiet link to the ledger.
-- One-tap flare start that immediately asks "When did it start?" with fuzzy
-  onset options (today / a few days ago / around a date), persisted per user.
-- A minimal read-only ledger screen: a designed empty state, and when flares
-  exist a simple chronological list (onset, status, duration for closed).
-- Boundary input validation and rate limiting on mutations and auth.
-- Designed empty, loading, and error states for the screens in this EPIC.
-- Staging deploy scaffold: committed `Dockerfile` and
-  `docker-compose.staging.yml`, a public healthcheck endpoint, and
-  observability (Sentry + Umami) wired via env with graceful degradation.
-- `SEED_DEMO=1` seeding: a demo user with a reconstruction-ready flare
-  history so a stranger opening staging sees real content within a minute.
+- A **flare-end interview**: from an open flare, "This flare ended" opens a
+  short branching flow of 2 to 5 steps, one question per step, fully usable
+  at 390px. It captures end date with precision, peak severity, zero or more
+  treatments, and optional impact and symptom notes, then closes the flare
+  atomically.
+- **Closing** a flare: sets status to `closed`, stores the end date and
+  precision, and derives duration from onset and end. An already-closed
+  flare cannot be closed again.
+- **Uncertainty as first-class data**: fuzzy end dates and fuzzy treatment
+  starts are stored with a precision flag and rendered as hedged text, never
+  rounded into false precision. Severity and treatment-start may be left
+  "not sure" and stored as absent.
+- **Editing after the fact**: a flare edit surface where a closed flare can
+  be reopened, its recorded fields corrected, and its treatments added,
+  edited, and removed.
+- New API routes for close, edit, reopen, and treatment CRUD, each
+  authorized server-side, input-validated at the boundary, and rate-limited.
+- Designed empty, loading, and error states for every new surface; mobile-
+  first at 390px; a copy sweep of every new user-visible string.
 
 ### Out of scope (build in later EPICs, not here)
-- The flare-end interview and closing a flare from the UI (EPIC 2).
-- The full ledger: flare detail, edit, treatment display, export, and the
-  ledger's own perf pass (EPIC 3). This EPIC ships only the empty state plus
-  a minimal capped list.
-- Pre-appointment reconstruction and the one-page render (EPIC 4).
-- The guided first-run overlay, PWA install, and the covenant nudge (EPIC 5).
-- Any product-wide polish audit (EPIC 6).
+- The rich ledger presentation, per-flare read-only detail polish, export
+  (JSON/CSV), and the ledger's perf pass belong to **EPIC 3**. This EPIC
+  adds only the minimum ledger display needed to show closed-flare duration
+  and reach the edit surface, plus the edit surface itself. Do not build
+  export or list pagination here.
+- Pre-appointment reconstruction and the one-page render (**EPIC 4**).
+- The guided first-run overlay, PWA install, and the single covenant nudge
+  (**EPIC 5**).
+- The product-wide polish audit (**EPIC 6**).
 
 ### Non-Goals (binding — a defect if built)
-- **No flare-end interview** in the UI. This EPIC never closes a flare
-  through an interview flow.
-- **No reconstruction** of any timeline, and no appointment entity.
-- **No analytics views or charts** of the user's own data. (Umami product
-  analytics is infra, not a user-facing chart.)
-- **No scheduled prompts of any kind**: no reminders, no daily check-in, no
-  streaks, no email or push. If a timer or cron that nudges the user appears
-  anywhere, it is a defect.
-- **No LLM** anywhere in this EPIC. No key entry surface, no model calls.
+- **No adaptive or LLM-driven interview.** The interview is a fixed,
+  deterministic sequence of steps. No model call, no key-entry surface, no
+  branching driven by anything other than the user's own answers (for
+  example, skipping treatment detail when the user tried nothing).
+- **No reminders or scheduled prompts of any kind.** No timer, cron, daily
+  check-in, streak, or nudge may be introduced anywhere. (The single
+  covenant nudge is EPIC 5's job, not this one.)
+- **No severity charts, trend graphs, or correlation views.** Severity is
+  stored and shown as a single value per flare, never plotted or correlated.
+- **No new entities** beyond what the interview writes onto `flares` and
+  `treatments`. No appointment, no export, no free-form journal.
 
 ---
 
 ## 2. First-run and the quality bar (read before building)
 
-The QUALITY BAR requires a first-run that lets a brand-new user understand
-the product and reach the core action, and it requires a guided walkthrough.
-The product plan assigns the **guided walkthrough overlay to EPIC 5**. Do not
-build that overlay here. In this EPIC the bar is met by clarity, not by a
-tour:
-- The first screen states in one short line what the app does and shows one
-  obvious action.
-- The empty ledger names the first action in positive phrasing.
-- The core action (start a flare, set onset) is reachable in one tap and is
-  self-evident.
+The QUALITY BAR requires a guided first run. The product plan assigns the
+**guided walkthrough overlay to EPIC 5**; do not build it here. In this EPIC
+the bar is met by the interview being self-evident, not by a tour:
+- The trigger reads plainly ("This flare ended") and sits on the open flare.
+- Each step asks exactly one question in one short line, with real controls
+  and sensible defaults, so the user acts by looking, not by reading.
+- Skipping an optional step is always one obvious tap.
 
-This is the correct reading of the bar-and-scope rule: the core action is
-reachable without documentation, so nothing is being traded away. The 2-to-4
-step guided path arrives in EPIC 5. Building it now is drift; omitting
-first-run clarity is a defect. Deliver the clarity, not the overlay.
+Building the EPIC 5 overlay now is drift; shipping a confusing interview is
+a defect. Deliver a self-evident flow, not an overlay.
 
 ---
 
 ## 3. Technical design
 
-### 3.1 Stack (concrete — build on this)
-- **Runtime / language:** Node.js 20, TypeScript.
-- **Framework:** Next.js (App Router). React Server Components render the
-  screens (fast first meaningful render); Route Handlers under `app/api/*`
-  serve the JSON API. One process, one Dockerfile, one container.
-- **Database:** PostgreSQL 16. **Prisma** ORM with forward-only migrations
-  committed under `prisma/migrations/`.
-- **Validation:** Zod schemas at every API boundary.
-- **Auth:** email + password. Passwords hashed with **argon2id**. Sessions
-  are opaque, stored in a `sessions` table, referenced by an httpOnly,
-  Secure, SameSite=Lax cookie. Session lookup on every protected request.
-- **Rate limiting:** a small in-process fixed-window limiter module keyed by
-  IP for auth and by user id for mutations. In-memory is acceptable for the
-  single staging instance. Note in code that a shared store is a later
-  concern; do not add Redis in this EPIC.
-- **Observability:** `@sentry/nextjs` initialized only when `SENTRY_DSN` is
-  set; the Umami script tag rendered only when `UMAMI_WEBSITE_ID` and
-  `UMAMI_URL` are set. Both absent means the app runs normally.
-- **Tests:** Vitest for unit and API-integration tests (against a disposable
-  Postgres); Playwright for browser and mobile-viewport checks.
+Build on the EPIC 1 stack unchanged: Next.js App Router (RSC screens +
+Route Handlers under `src/app/api/*`), PostgreSQL 16 with Prisma and
+forward-only migrations, Zod at every boundary, argon2id sessions looked up
+server-side on every protected request, the in-process fixed-window rate
+limiter, Sentry/Umami gated on env. Reuse the existing helpers rather than
+re-inventing them: `requireUser` and `guardMutation` (`src/lib/api.ts`),
+the JSON error envelope `errorResponse`/`jsonResponse`, the date math in
+`src/lib/date.ts`, and the onset-derivation pattern in `src/lib/onset.ts`.
 
-If the implementer has a strong reason to deviate from Next.js, the contract
-below (routes, status codes, data model, env, deploy) is authoritative and
-must be honored by whatever stack replaces it. Do not deviate on the
-contract.
+### 3.1 Files and modules
 
-### 3.2 Files and modules to create (indicative tree)
+Create:
 ```
-Dockerfile
-docker-compose.staging.yml
-.env.example                      # placeholders only, tracked
-.dockerignore
-package.json / tsconfig.json / next.config.js
-prisma/schema.prisma
-prisma/migrations/**              # forward-only
-prisma/seed.ts                    # SEED_DEMO demo user + history
-src/lib/db.ts                     # Prisma client singleton
-src/lib/auth.ts                   # hashing, session create/verify, current user
-src/lib/rateLimit.ts              # in-process fixed-window limiter
-src/lib/validation.ts             # Zod schemas (auth, onset)
-src/lib/onset.ts                  # onset-choice -> {onset_date, onset_precision}
-src/lib/observability.ts          # Sentry + Umami gating
-src/app/api/health/route.ts
-src/app/api/auth/signup/route.ts
-src/app/api/auth/signin/route.ts
-src/app/api/auth/signout/route.ts
-src/app/api/me/route.ts
-src/app/api/flares/route.ts       # POST create, GET list
-src/app/api/flares/[id]/route.ts  # GET one, PATCH onset
-src/app/(auth)/signin/page.tsx
-src/app/(auth)/signup/page.tsx
-src/app/(app)/home/page.tsx       # the button + open flare
-src/app/(app)/ledger/page.tsx     # empty state + minimal list
-src/components/*                   # button, onset sheet, states, skeletons
-tests/**                           # vitest + playwright
+prisma/migrations/0002_*/migration.sql   # add flares.impact_note, flares.symptom_note
+src/lib/interview.ts                      # derive end date + treatment start; close/edit input types
+src/lib/treatment.ts                      # (optional) treatment-start derivation if not in interview.ts
+src/app/api/flares/[id]/close/route.ts    # POST: submit the interview, close atomically
+src/app/api/flares/[id]/treatments/route.ts       # POST: add one treatment
+src/app/api/treatments/[id]/route.ts      # PATCH edit, DELETE remove one treatment
+src/app/(app)/flares/[id]/edit/page.tsx   # the edit surface (RSC shell + client editor)
+src/components/EndInterview.tsx           # the multi-step interview (client)
+src/components/FlareEditor.tsx            # edit fields, reopen, treatment add/edit/remove (client)
+src/components/EndFlareButton.tsx         # launches EndInterview from the open flare
+tests/interview.test.ts                   # end-date + treatment-start derivation, duration hedging
+tests/close.integration.test.ts          # close/reopen/edit + treatment CRUD API behavior
+tests/nonGoalGuard.test.ts               # inspection guard for scheduled prompts / streaks / charts
+e2e/interview.spec.ts                     # 390px interview walk + close + edit
 ```
 
-### 3.3 Data model (forward-only migration)
+Modify:
+```
+prisma/schema.prisma          # add impactNote, symptomNote to Flare
+src/lib/validation.ts         # add close, flare-edit, and treatment Zod schemas (all .strict())
+src/lib/serialize.ts          # include treatments + impact/symptom notes; expose end fields
+src/lib/display.ts            # add endText(); hedge durationText() when precision is approx
+src/app/api/flares/[id]/route.ts   # extend PATCH: edit end/severity/notes and reopen; GET includes treatments
+src/app/(app)/home/page.tsx        # open-flare card gains "This flare ended"
+src/app/(app)/ledger/page.tsx      # closed rows show hedged duration + end + link to edit
+tests/copy.test.ts            # ROOTS already cover src/app + src/components; confirm new files are scanned
+tests/serialize.test.ts       # extend for treatments + note fields
+```
 
-This EPIC's app code reads and writes `users`, `sessions`, and `flares`
-(onset and status). The `flares` end/severity columns and the `treatments`
-table are created now and populated **only by the demo seed**, because the
-acceptance criteria require a reconstruction-ready demo history and later
-EPICs render it. Do not build UI flows that write end/severity/treatments in
-this EPIC. Later EPICs add their own columns (`impact_note`, `symptom_note`,
-`nudged_at`, appointments) in their own migrations.
+Do not introduce new frameworks, a state library, or a design system. Match
+the existing plain-CSS class vocabulary (`btn`, `btn-primary`,
+`btn-secondary`, `btn-ghost`, `card`, `stack`, `sheet`, `sheet-scrim`,
+`field`, `input`, `pill`, `muted`, `form-error`) used by `OnsetSheet` and
+the current screens.
 
-**Migration `0001_init`:**
+### 3.2 Data model (forward-only migration `0002`)
 
-`users`
-- `id` uuid pk
-- `email` text unique, not null (stored lowercased)
-- `password_hash` text not null
-- `condition_label` text null  *(reserved; not edited in this EPIC)*
-- `created_at` timestamptz not null default now()
-
-`sessions`
-- `id` uuid pk  *(the opaque session token; store a hash of it, not the raw)*
-- `user_id` uuid fk -> users(id) on delete cascade, indexed
-- `expires_at` timestamptz not null
-- `created_at` timestamptz not null default now()
+The interview writes onto columns that already exist from `0001_init`
+(`flares.status`, `end_date`, `end_precision`, `peak_severity`; the whole
+`treatments` table). The only new columns are the two optional notes:
 
 `flares`
-- `id` uuid pk
-- `user_id` uuid fk -> users(id) on delete cascade, **indexed** (hot path)
-- `status` text not null default `'open'`  *(check in (`'open'`,`'closed'`))*
-- `onset_date` date not null
-- `onset_precision` text not null  *(check in (`'exact'`,`'approx'`))*
-- `end_date` date null            *(seed only this EPIC)*
-- `end_precision` text null        *(seed only this EPIC)*
-- `peak_severity` smallint null    *(seed only this EPIC; scale 1..5)*
-- `created_at` timestamptz not null default now()
-- `updated_at` timestamptz not null default now()
-- index on `(user_id, created_at desc)` for the ledger query
+- `impact_note` text null   *(how the flare affected the user; max 1000 chars)*
+- `symptom_note` text null  *(symptoms the user noticed; max 1000 chars)*
 
-`treatments`  *(seed only this EPIC; no UI writes it here)*
-- `id` uuid pk
-- `flare_id` uuid fk -> flares(id) on delete cascade, indexed
-- `name` text not null
-- `started_on` date null
-- `started_precision` text null
-- `helped` text null  *(check in (`'yes'`,`'no'`,`'unsure'`))*
-- `note` text null
-- `created_at` timestamptz not null default now()
+Migration rules:
+- Forward-only, additive, nullable columns. No backfill needed; existing
+  rows (including the demo seed) remain valid.
+- The migration must apply cleanly on a database already at `0001_init`.
+- No `treatments` schema change: `name`, `started_on`, `started_precision`,
+  `helped`, `note` already exist and are sufficient.
 
-### 3.4 Onset semantics (`src/lib/onset.ts`)
-Given the user's choice, the **server** derives the stored values. The client
-never sends a computed onset_date for the fuzzy options.
-- `today` -> `onset_date = <server today>`, `onset_precision = 'exact'`.
-- `few_days_ago` -> `onset_date = <server today> - 3 days`,
-  `onset_precision = 'approx'`. (The 3-day anchor is a documented default;
-  it is shown to the user as "a few days ago", never as a hard date.)
+Value domains enforced at the API boundary (Zod), consistent with the
+existing seed data so no CHECK migration is required:
+- `flares.status` in (`'open'`, `'closed'`).
+- `flares.end_precision` in (`'exact'`, `'approx'`), null only while open.
+- `flares.peak_severity` integer 1..5, or null ("not sure").
+- `treatments.started_precision` in (`'exact'`, `'approx'`), null when the
+  user did not note a start.
+- `treatments.helped` in (`'yes'`, `'no'`, `'unsure'`).
+
+### 3.3 Interview semantics (`src/lib/interview.ts`)
+
+The **server** derives every stored date from the user's choice; the client
+never sends a computed date for a fuzzy option. Reuse `todayUtc`, `addDays`,
+`parseIsoDate` from `src/lib/date.ts` and the `FEW_DAYS_ANCHOR = 3` /
+`MAX_ONSET_DAYS_BACK = 730` constants pattern from `src/lib/onset.ts`.
+
+**End date** (`deriveEnd(choice, aroundDate, onsetDate, today)`):
+- `today` -> `end_date = <server today>`, `end_precision = 'exact'`.
+- `few_days_ago` -> `end_date = <server today> - 3 days`,
+  `end_precision = 'approx'` (shown as "a few days ago", never a hard date).
 - `around_date` -> requires `around_date` (ISO `YYYY-MM-DD`);
-  `onset_date = around_date`, `onset_precision = 'approx'`.
+  `end_date = around_date`, `end_precision = 'approx'`.
+- Reject (`400`) when: unknown choice; `around_date` missing/invalid/in the
+  future; **end date is before the flare's onset date**; end date is more
+  than 730 days after onset (almost certainly a typo).
 
-"Today" must render as an exact date. The two approx options must render as
-hedged text ("a few days ago", "around <month day>"), never as false
-precision. Compute "today" from the server clock in UTC; document this so
-tests are deterministic.
+**Treatment start** (`deriveTreatmentStart(choice, aroundDate, onsetDate, onsetPrecision, today)`):
+- `flare_onset` -> `started_on = onset_date`, `started_precision = onsetPrecision`
+  (the treatment began with the flare; it inherits the flare's own
+  certainty).
+- `few_days_in` -> `started_on = onset_date + 3 days`,
+  `started_precision = 'approx'` (shown as "a few days in", covers answers
+  like "about day 3" without false precision).
+- `around_date` -> requires a valid `YYYY-MM-DD` not before onset and not in
+  the future; `started_precision = 'approx'`.
+- `unsure` -> `started_on = null`, `started_precision = null` (shown as
+  "start not recorded"; uncertainty stored as absence, never invented).
+- Reject (`400`) on unknown choice or an out-of-range `around_date`.
 
-### 3.5 API contract
+**Duration** stays as in `serializeFlare`: `daysBetween(onset, end) + 1`,
+so a same-day flare reads as one day. It is derived, never stored.
 
-Envelope: JSON request and response. Errors return
-`{ "error": { "message": "<product voice>" } }` with the status below. No
-stack traces, no internal error strings, no PII in the body.
+### 3.4 Hedged rendering (`src/lib/display.ts`)
 
-**Public routes (no session required):**
-- `GET /api/health` -> `200 { "status": "ok" }`. Must not touch auth and
-  must return 200 whenever the process is up (it may check the DB and return
-  `503` if the DB is unreachable; 200 otherwise). Used by the compose
-  healthcheck.
-- `POST /api/auth/signup` `{ email, password }` -> `201`, sets session
-  cookie. Validation: email is a valid address; password length 8..200.
-  Duplicate email -> `409`. Rate-limited by IP.
-- `POST /api/auth/signin` `{ email, password }` -> `200`, sets session
-  cookie. Bad credentials -> `401` (do not reveal which field failed).
-  Rate-limited by IP.
+Uncertainty must reach the screen as hedged wording:
+- Add `endText(flare)`: `'Ended ' + formatExact` when `end_precision` is
+  `exact`; `'Ended around ' + formatMonthDay` when `approx`; null while open.
+- Change `durationText` (or add `durationTextFor(flare)`) so duration reads
+  `about N days` when **either** onset or end precision is `approx`, and
+  `N days` only when both are exact. This keeps EPIC 4's headline honest.
+- Treatment start renders via a helper: `Started at the flare's onset` /
+  `Started a few days in` / `Started around <month day>` /
+  `Start not recorded`, chosen from `started_precision` and the stored date.
+- `helped` renders as `Helped` / `Didn't help` / `Not sure`.
+- Never show `peak_severity` as a chart. Show it as one value with a word
+  anchor, for example `Peak severity 4 of 5`. Null renders `Severity not
+  recorded`.
 
-**Protected routes (valid session required; no session -> `401`):**
-- `POST /api/auth/signout` -> `204`, clears the cookie and deletes the
-  session row. Rate-limited.
-- `GET /api/me` -> `200 { id, email, condition_label }`.
-- `POST /api/flares` -> `201 { flare }`. Creates an open flare with a
-  provisional onset (`onset_date = today`, `onset_precision = 'exact'`) so
-  the flare is recorded on the first tap. Rate-limited by user.
-- `PATCH /api/flares/:id` `{ onset_choice, around_date? }` -> `200 { flare }`.
-  Sets the onset per §3.4. **This EPIC accepts only onset fields**; any other
-  field in the body is rejected with `400`. The flare must belong to the
-  caller, else `404`. Rate-limited by user.
-- `GET /api/flares` -> `200 { flares: [...] }`. The caller's flares only,
-  newest first, capped (default and max limit 50 in this EPIC). Indexed by
-  `(user_id, created_at desc)`.
-- `GET /api/flares/:id` -> `200 { flare }` for the owner, else `404`. Lets
-  the onset sheet reload the persisted choice.
+### 3.5 Serialization (`src/lib/serialize.ts`)
 
-**Authorization rule:** every route except the three public routes above
-loads the session server-side and returns `401` when it is missing or
-expired. Ownership is checked on every `:id` route; a mismatch returns `404`
-(do not confirm existence of another user's row). Hiding a UI control is
-never the access check.
+- Extend `FlareDTO` with `impactNote: string | null`,
+  `symptomNote: string | null`, and an optional `treatments?: TreatmentDTO[]`.
+- Add `serializeTreatment(t)` -> `{ id, name, startedOn (iso|null),
+  startedPrecision, helped, note }`.
+- `serializeFlare` includes `treatments` only when the caller passed a flare
+  loaded with its treatments (the list endpoint stays lean; detail/edit
+  includes them). Treatments, when present, are ordered by `started_on`
+  ascending with nulls last, then `created_at`.
 
-**Validation rule:** reject at the boundary with `400`:
-- unknown `onset_choice`;
-- `around_date` missing when choice is `around_date`, or not a valid
-  `YYYY-MM-DD`, or in the future, or more than 730 days before today;
-- malformed email, out-of-range password length;
-- unexpected fields on the flare PATCH body.
+### 3.6 API contract
 
-**Rate-limit rule:** auth endpoints limited per IP (e.g. 10 requests / 60s);
-mutations (`POST/PATCH/DELETE`) limited per user (e.g. 60 / 60s). Over the
-limit returns `429` with a product-voice message. Values are configurable via
-env with the defaults above.
+Envelope unchanged: JSON in and out; errors are
+`{ "error": { "message": "<product voice>" } }` with no stack traces, no
+internal strings, no PII. Every route below loads the session server-side
+via `requireUser` and returns `401` when it is missing or expired. Every
+`:id` route checks ownership and returns `404` on a mismatch (never confirm
+another user's row exists). Every mutation calls `guardMutation(user.id)`
+and returns `429` when over the per-user limit. Treatment ownership is
+checked by joining the treatment to its flare and comparing `flare.userId`.
 
-### 3.6 Screens and states (mobile-first, 390px baseline)
+**`POST /api/flares/:id/close`** — submit the interview, close atomically.
+Body (`.strict()`):
+```
+{
+  end_choice: "today" | "few_days_ago" | "around_date",
+  end_around_date?: "YYYY-MM-DD",
+  peak_severity?: 1..5 | null,
+  impact_note?: string (<=1000),
+  symptom_note?: string (<=1000),
+  treatments?: Array<{
+    name: string (1..120),
+    start_choice: "flare_onset" | "few_days_in" | "around_date" | "unsure",
+    start_around_date?: "YYYY-MM-DD",
+    helped: "yes" | "no" | "unsure",
+    note?: string (<=1000)
+  }>   // 0..20 items
+}
+```
+- `409` when the flare is already `closed` (the guard for "cannot be closed
+  again").
+- `400` on any invalid field per §3.3 (bad end choice, end before onset,
+  future date, invalid treatment start, oversize strings, unknown fields,
+  more than 20 treatments).
+- On success `200 { flare }` with the flare serialized **including its
+  treatments**, `status: "closed"`, and derived `durationDays`.
+- The whole write (flare fields + all treatments) happens in **one Prisma
+  transaction** so a partial close is impossible.
 
-**Sign in / Sign up.** Email + password only. One primary button. Inline
-field errors in product voice. Labeled inputs, visible focus, keyboard
-reachable.
+**`PATCH /api/flares/:id`** — extend the existing handler to a partial edit.
+Accept a `.strict()` schema whose fields are all optional but at least one
+present:
+- `onset_choice` / `around_date` — the existing onset edit, unchanged.
+- `end_choice` / `end_around_date` — re-set the end date on a closed flare.
+- `peak_severity` (1..5 or null), `impact_note`, `symptom_note`.
+- `reopen: true` — set `status = 'open'` and **clear** `end_date` and
+  `end_precision` (the flare is active again; duration returns to null).
+  Keep severity, notes, and treatments (they remain valid observations).
+- Reject (`400`) editing end/severity/notes on an `open` flare that is not
+  simultaneously being closed (end fields belong to a closed flare); reject
+  unknown fields; reject `reopen` combined with `end_*`.
+- Preserve the current onset-only behavior exactly: a body of
+  `{ onset_choice, around_date? }` still works so `OnsetSheet` is untouched.
+- `200 { flare }` (with treatments) on success, `404` on ownership miss.
 
-**Home (`/home`).**
-- New user (no flares): one short line of what the app does, and one obvious
-  primary button "Start a flare". This doubles as the first-run clarity in
-  §2.
-- With an open flare: show the open flare (hedged onset text) prominently and
-  a quiet link to the ledger. "Start a flare" stays available and starts a
-  new flare.
-- Pressing "Start a flare": optimistic pressed state within 100ms, navigate
-  to the onset sheet immediately while `POST /api/flares` resolves.
+**`GET /api/flares/:id`** — extend to load and serialize the flare's
+treatments so the edit surface can render and reload them. Still `404` for a
+non-owner.
 
-**Onset sheet.** Title "When did it start?" Three tap targets: "Today", "A
-few days ago", "Around a date". Choosing one of the first two is a single tap
-that saves and dismisses. "Around a date" reveals a native date input, then
-saves. The saved choice persists across reload (re-fetched via
-`GET /api/flares/:id`). Every target is at least 44px.
+**`POST /api/flares/:id/treatments`** — add one treatment to an owned flare.
+Body (`.strict()`): `{ name, start_choice, start_around_date?, helped,
+note? }` (same field rules as above). `201 { treatment }`. `404` if the
+flare is not the caller's.
 
-**Ledger (`/ledger`).**
-- Empty: a designed empty state that says what the screen is for and the
-  first action, in positive phrasing, with a "Start a flare" button.
-- Non-empty: a simple newest-first list. Each row shows onset (hedged when
-  approx), status, and duration when closed. No detail navigation, no
-  treatments, no export in this EPIC.
+**`PATCH /api/treatments/:id`** — edit one treatment. Body (`.strict()`,
+all optional, at least one present): `{ name?, start_choice?,
+start_around_date?, helped?, note? }`. Ownership via the parent flare.
+`200 { treatment }`, `404` on mismatch.
 
-**Global states.**
-- Loading: skeleton placeholders that hold the layout steady on home and
-  ledger. No white screen, no lone spinner with no exit.
-- Error: product-voice message with a retry affordance. No raw stack trace,
-  no error code shown to the user.
+**`DELETE /api/treatments/:id`** — remove one treatment. `204` on success,
+`404` on mismatch. Rate-limited (it is a mutation).
 
-**Copy rules.** Every visible string obeys QUALITY BAR §7 and §8: one obvious
-action per screen, words cut to the minimum, positive phrasing, no em-dashes
-or dash-asides, none of the banned LLM vocabulary. Sweep before done. Suggested
-strings (final wording is the implementer's, held to the same bar):
-- Home line: "Log a flare in seconds. Build a record your doctor can read."
-- Primary action: "Start a flare".
-- Onset title: "When did it start?"; options "Today" / "A few days ago" /
-  "Around a date".
-- Empty ledger: heading "Your flares will live here." body "Start one the
-  moment it begins. It takes a tap." button "Start a flare".
+**`GET /api/flares`** — unchanged contract (owner's flares, newest first,
+capped at 50). It stays lean and does **not** embed treatments.
+
+### 3.7 Screens and states (mobile-first, 390px baseline)
+
+**Home (`/home`).** The open-flare card gains one clear action, "This flare
+ended", visibly primary within that card. It launches the interview.
+"Adjust onset" stays as the quiet secondary. Pressing "This flare ended"
+gives a pressed state within 100ms and opens the interview immediately.
+
+**End interview (`EndInterview.tsx`).** A step sheet reusing the
+`sheet`/`sheet-scrim` dialog pattern from `OnsetSheet`, `role="dialog"`,
+`aria-modal`, focus moved to the step heading on each step, closable by
+scrim or a "Close" control (closing before the final step discards, and the
+flare stays open). One question per step, a quiet "Step N of M" indicator,
+a "Back" affordance after step 1. Steps:
+1. **End date** — "When did it end?" Three taps: "Today", "A few days ago",
+   "Around a date" (reveals a native date input capped at today). One tap
+   advances.
+2. **Peak severity** — "How bad did it get?" A 1..5 control with word
+   anchors at the ends (for example "Mild" to "Severe") and a "Not sure"
+   option that stores null. One tap advances.
+3. **Treatments** — "What did you try?" Start with two choices: "Add a
+   treatment" and "I didn't try anything". Adding one asks, on a compact
+   sub-form: a name (placeholder shows a real example such as "Naproxen"),
+   "When did you start it?" ("When the flare began" / "A few days in" /
+   "Around a date" / "Not sure"), and "Did it help?" ("Helped" / "Didn't
+   help" / "Not sure"). Added treatments list above the form with a remove
+   control; "Add another" repeats; "Done" advances. This is the branching
+   step: choosing "I didn't try anything" records zero treatments and skips
+   straight to step 4.
+4. **Notes (optional)** — "Anything else to remember?" Two optional
+   multiline fields: "How it affected you" (impact) and "Symptoms you
+   noticed" (symptom). Primary "Save and close"; secondary "Skip and close"
+   leaves both empty. Submitting sends one `POST /api/flares/:id/close` with
+   everything collected, shows an in-flight state within 100ms, and on
+   success returns to home where the flare now reads closed.
+
+The interview is 4 steps, inside the 2-to-5 bound, and collapses to 3 when
+the user tries nothing. It never asks the same thing twice and never
+requires typing except a treatment name the user chose to add.
+
+**Flare edit (`/flares/:id/edit`).** The edit surface for correcting a
+flare after the fact. An RSC shell loads the flare (with treatments) and
+renders `FlareEditor`:
+- Edit end date (fuzzy, same control), peak severity, impact and symptom
+  notes; save via `PATCH /api/flares/:id`.
+- A "Reopen this flare" action for a closed flare (`PATCH { reopen: true }`),
+  and for an open flare a path back into the close interview.
+- Treatments list with add (`POST`), edit (`PATCH`), and remove (`DELETE`)
+  per row, each with optimistic feedback within 100ms and a product-voice
+  error on failure.
+- Reachable from the ledger row and from the home open-flare card.
+
+**Ledger (`/ledger`).** Minimal additions only (rich presentation is EPIC
+3): each closed row shows hedged duration ("Lasted about 6 days") and end
+("Ended around Sep 10"), and each row links to its edit surface. Keep the
+existing empty state and newest-first list. Do not add export, pagination
+controls, filters, or treatment expansion here.
+
+**Global states (every new surface).**
+- **Loading**: skeletons or in-place spinners that hold the layout steady on
+  the edit page and during interview submission. No white screen, no
+  dead-end spinner.
+- **Empty**: the treatments step's "before you add anything" state names the
+  action positively ("Add a treatment"). The edit page's no-treatments state
+  says what the section is for and offers "Add a treatment".
+- **Error**: product-voice message with a retry affordance on every failed
+  fetch. Never a raw stack trace or status code. A `409` (already closed)
+  reads as a plain sentence and routes the user to the flare rather than
+  dead-ending.
+
+### 3.8 Copy rules
+
+Every new visible string obeys QUALITY BAR §7 and §8: one obvious action per
+step, words cut to the minimum, positive phrasing, no em-dashes or
+dash-asides, none of the banned LLM vocabulary. Sweep before done (§4 of the
+task list). Suggested strings (final wording is the implementer's, held to
+the same bar):
+- Trigger: "This flare ended".
+- Step titles: "When did it end?", "How bad did it get?", "What did you
+  try?", "Anything else to remember?".
+- Treatment step: "Add a treatment" / "I didn't try anything";
+  "When did you start it?" ("When the flare began" / "A few days in" /
+  "Around a date" / "Not sure"); "Did it help?" ("Helped" / "Didn't help" /
+  "Not sure").
+- Notes step: "How it affected you", "Symptoms you noticed",
+  "Save and close", "Skip and close".
+- Edit page: "Edit flare", "Reopen this flare", "Add a treatment",
+  "Remove", "Save".
+- Ledger closed row: "Lasted about 6 days", "Ended around Sep 10".
 - Generic error: "Check your connection and try again."
+- Already-closed message: "This flare is already closed. You can edit it."
 
-### 3.7 Observability, secrets, logging
-- Initialize Sentry only when `SENTRY_DSN` is present; wire it into the
-  backend (and the frontend where the framework supports it). Absent DSN:
-  no init, no crash.
-- Render the Umami script only when `UMAMI_WEBSITE_ID` and `UMAMI_URL` are
-  present. Absent: no tag, no crash.
-- Secrets come from env only. `.env` is untracked (add to `.gitignore` and
-  `.dockerignore`). `.env.example` carries placeholder keys only:
-  `DATABASE_URL`, `SESSION_SECRET` (if used for cookie signing), `SENTRY_DSN`,
-  `UMAMI_URL`, `UMAMI_WEBSITE_ID`, `SEED_DEMO`, `RATE_LIMIT_*`.
-- **No PII in logs.** Never log email addresses, passwords, session tokens,
-  or request bodies containing them. Log a user by id only.
+### 3.9 Security, secrets, logging
 
-### 3.8 Deploy scaffold
-- **`Dockerfile`:** multi-stage build producing a production start of the
-  app. Runs DB migrations on start (or a documented pre-start step), then
-  serves. Exposes the app port.
-- **`docker-compose.staging.yml`:** two services, `app` and a `db`
-  (Postgres 16 with a named volume). `app` depends on `db` being healthy,
-  reads env from `.env`, and defines a healthcheck that polls
-  `GET /api/health`. `docker compose -f docker-compose.staging.yml up` must
-  build from the committed Dockerfile and serve the app end to end.
-- Honor the `SEED_DEMO` convention: when `SEED_DEMO=1`, seeding runs on
-  start (idempotently) so a fresh staging environment shows demo content.
-
-### 3.9 Demo seed (`SEED_DEMO=1`)
-Idempotent (safe to run repeatedly; keyed on the demo email). Creates:
-- One demo user with known credentials documented in the README.
-- At least **two closed past flares** with realistic onset and end dates and
-  peak severity, spread across recent months, plus at least one **open**
-  flare so the home screen shows a live state.
-- Treatments on the closed flares that make the history reconstruction-ready,
-  including one flare where a named treatment (for example naproxen) started
-  on day one and that flare is noticeably shorter, so EPIC 4's headline has
-  real source data.
-The result: opening staging and signing in as the demo user shows real
-flares in the ledger and an open flare on home within a minute, with no hand
-input. The seed copy is user-visible in later EPICs; sweep it for banned
-tells now.
+- Authorization on every new route server-side, per §3.6. Hiding the "This
+  flare ended" button is never the access check.
+- Zod `.strict()` validation at every boundary: types, enum membership,
+  string length caps (name <=120, notes <=1000), array cap (<=20
+  treatments), date format and range. Unknown fields rejected with `400`.
+- `guardMutation` on every `POST`/`PATCH`/`DELETE`. Values stay
+  env-configurable with the EPIC 1 defaults.
+- No secrets added; no new env required. No PII in logs: never log note
+  text, treatment names, or email. Log a user or flare by id only.
 
 ---
 
 ## 4. Ordered task list (each with acceptance criteria)
 
-**T1. Project scaffold and healthcheck.**
-- Next.js + TypeScript app builds and starts. `GET /api/health` returns
-  `200 { status: "ok" }` and is reachable without a session.
-- AC: `docker compose -f docker-compose.staging.yml up` builds from the
-  committed Dockerfile, brings up app + db, and the compose healthcheck goes
-  healthy hitting `/api/health`.
+**T1. Migration and model.** Add `flares.impact_note` and
+`flares.symptom_note` (nullable text) in `0002`, and the Prisma fields.
+- AC: `0002` applies cleanly on a DB already at `0001_init`; the demo seed
+  and existing rows remain valid; `impactNote`/`symptomNote` are readable and
+  writable through Prisma.
 
-**T2. Data model and migration.**
-- `prisma/schema.prisma` and `0001_init` create `users`, `sessions`,
-  `flares`, `treatments` per §3.3, with the indexes named there.
-- AC: migration applies cleanly on an empty database; `flares(user_id)` and
-  `(user_id, created_at desc)` indexes exist.
+**T2. Interview derivation library.** `src/lib/interview.ts` with
+`deriveEnd` and `deriveTreatmentStart` per §3.3, plus the hedged
+`endText`/duration helpers in `src/lib/display.ts` per §3.4.
+- AC: unit tests prove end mapping (today->exact; few_days_ago->approx,
+  today-3; around_date->approx), the onset-guard (end before onset ->
+  error), treatment-start mapping including `unsure`->null, and that
+  duration reads "about N days" when either precision is approx and "N days"
+  when both are exact.
 
-**T3. Auth and sessions.**
-- Sign up, sign in, sign out with argon2id hashing and DB-backed sessions in
-  an httpOnly Secure SameSite=Lax cookie.
-- AC: a new user can sign up and sign in. `GET /api/me` returns the user with
-  a valid session and `401` without one. Signout deletes the session and
-  clears the cookie. Duplicate signup email returns `409`. Bad signin returns
-  `401` without revealing the failing field.
+**T3. Close endpoint.** `POST /api/flares/:id/close` submits the interview
+and closes atomically per §3.6.
+- AC: closing an open flare sets `status="closed"`, stores end
+  date/precision, severity, notes, and any treatments in one transaction,
+  and returns the flare with derived duration and its treatments.
+- AC: closing an already-closed flare returns `409`; an invalid payload
+  (bad end choice, end before onset, future date, oversize string, unknown
+  field, >20 treatments) returns `400`; no session returns `401`; another
+  user's flare id returns `404`; over the mutation limit returns `429`.
 
-**T4. Server-side authorization on every route.**
-- All routes except `/api/health`, `/api/auth/signup`, `/api/auth/signin`
-  require a valid session; `:id` routes check ownership.
-- AC: an automated test hits every protected route with no session and gets
-  `401`; hitting another user's flare id returns `404`.
+**T4. Edit, reopen, and treatment CRUD.** Extend `PATCH /api/flares/:id`
+(edit end/severity/notes, reopen) and `GET /api/flares/:id` (include
+treatments); add `POST /api/flares/:id/treatments`, `PATCH
+/api/treatments/:id`, `DELETE /api/treatments/:id` per §3.6.
+- AC: a closed flare can be reopened (`status="open"`, end fields cleared,
+  duration null, treatments kept); its end/severity/notes can be corrected;
+  a treatment can be added, edited, and removed, each reflected on reload.
+- AC: the legacy onset-only PATCH body still works unchanged.
+- AC: every new route rejects an unauthenticated request with `401`, a
+  cross-user id with `404`, an over-limit mutation with `429`, and an
+  invalid or unknown-field body with `400`.
 
-**T5. Start a flare + fuzzy onset + persistence.**
-- `POST /api/flares` records an open flare on first tap. The onset sheet sets
-  the choice via `PATCH /api/flares/:id`; server derives onset per §3.4.
-- AC: pressing "Start a flare" records a flare and immediately shows "When
-  did it start?" with the three fuzzy options. After choosing and reloading,
-  `GET /api/flares/:id` returns the persisted onset and the UI shows it.
-- AC: "Today" stores exact; "A few days ago" and "Around a date" store
-  approx and render hedged.
+**T5. The interview UI.** `EndFlareButton` on the home open-flare card and
+`EndInterview` implementing the 4-step flow per §3.7, at 390px.
+- AC: from an open flare, "This flare ended" opens an interview of 2 to 5
+  steps, one question per step, with no horizontal scroll at 390px and touch
+  targets at least 44px.
+- AC: the user can answer "a few days ago" for the end and "a few days in"
+  (or "not sure") for a treatment start in a single tap; after closing, the
+  ledger shows the flare closed with hedged duration and end.
+- AC: choosing "I didn't try anything" closes with zero treatments and skips
+  the treatment detail sub-form.
 
-**T6. Boundary validation and rate limiting.**
-- Zod validation on auth and onset; in-process limiter on auth (per IP) and
-  mutations (per user).
-- AC: malformed onset (unknown choice, missing/invalid/future `around_date`,
-  unexpected field) returns `400`. Exceeding the auth or mutation limit
-  returns `429`. Both messages are product voice.
+**T6. The edit surface.** `/flares/:id/edit` with `FlareEditor` per §3.7,
+reachable from the ledger and home.
+- AC: opening a closed flare's edit surface shows its recorded fields and
+  treatments; reopening, correcting a field, and adding/editing/removing a
+  treatment each persist and survive reload.
+- AC: designed loading, empty (no treatments), and error states; no white
+  screen, no raw stack trace; an already-closed conflict reads in product
+  voice.
 
-**T7. Home, ledger, and designed states.**
-- Home shows exactly one primary action and any open flare. Ledger shows a
-  designed empty state, and a minimal newest-first list when flares exist.
-  Loading skeletons and product-voice error states everywhere in this EPIC.
-- AC: at a 390px viewport there is no horizontal scroll, the "Start a flare"
-  target is at least 44px, and text is readable without zoom.
-- AC: the empty ledger states the screen's purpose and the first action in
-  positive phrasing (no "You don't have", "No ... yet", "Nothing here").
-- AC: no screen in this EPIC shows a white screen, a lone dead-end spinner,
-  or a raw stack trace.
+**T7. Ledger and display polish (minimal).** Closed rows show hedged
+duration and end and link to edit, reusing the new display helpers.
+- AC: at 390px the ledger has no horizontal scroll; a closed flare with an
+  approx onset or end reads "about N days", an exact-exact flare reads "N
+  days".
 
-**T8. Observability and secrets hygiene.**
-- Sentry gated on `SENTRY_DSN`, Umami gated on `UMAMI_WEBSITE_ID` +
-  `UMAMI_URL`. `.env.example` placeholders only; `.env` untracked.
-- AC: with all observability env unset the app starts and serves normally
-  (no crash). No secret appears in any tracked file. No email, password, or
-  token appears in logs.
+**T8. Non-Goal guard.** `tests/nonGoalGuard.test.ts` inspects the source and
+asserts the paradigm the app rejects was not introduced.
+- AC: the test fails if the codebase gains a scheduled prompt, reminder,
+  streak, daily check-in, cron/`setInterval`-driven nudge, or a
+  severity/trend/correlation chart. It scans app and component source for
+  those markers and passes on the current tree.
 
-**T9. Demo seed.**
-- `SEED_DEMO=1` seeds the demo user, closed past flares with treatments, and
-  an open flare, idempotently, per §3.9.
-- AC: on a fresh database with `SEED_DEMO=1`, signing in as the documented
-  demo user shows at least two past flares in the ledger and an open flare on
-  home, with no hand input, within a minute.
-
-**T10. README for strangers.**
-- `README.md`: what the app is (two or three plain sentences), how to run it
-  (exact clone / env / `docker compose -f docker-compose.staging.yml up`
-  commands verified against the committed compose file), the demo user
-  credentials, where the code lives, and how to run the tests. No factory
-  internals.
-- AC: a stranger can follow the README to a running app and a green test run.
-
-**Copy sweep (part of DONE, not a separate task).** Before finishing,
-mechanically search every user-visible string added or edited (components,
-pages, seed copy, error messages, `.env.example` comments if user-facing) for
-`—`, `–`, the banned LLM vocabulary, and negative empty-state phrasing. Fix
-every hit.
+**Copy sweep (part of DONE, not a separate task).** Mechanically search
+every user-visible string added or edited (new components, the edit page,
+error messages, step copy) for `—`, `–`, the banned LLM vocabulary, and
+negative empty-state phrasing ("You don't have", "No ... yet", "Nothing
+here", "Unable to", "Something went wrong"). Fix every hit. Confirm
+`tests/copy.test.ts` scans the new files (its ROOTS already include
+`src/app` and `src/components`).
 
 ---
 
@@ -433,32 +485,48 @@ every hit.
 
 | Acceptance criterion | Test type | What it asserts |
 |---|---|---|
-| Compose builds and serves; healthcheck 200 | Integration / CI | Build the image, `compose up`, poll `/api/health` until `200`; assert healthy |
-| Sign up and sign in work | API (Vitest) | Signup then signin succeed; cookie set; `/api/me` returns the user |
-| Every route rejects unauthenticated request (401) | API (Vitest) | Table-driven: each protected route with no cookie returns `401`; cross-user `:id` returns `404` |
-| One primary action, tappable at 390px, no h-scroll | Playwright (390px) | `document.scrollWidth <= innerWidth`; "Start a flare" bounding box height and width >= 44px; exactly one primary button |
-| Press records a flare and asks onset; persists on reload | Playwright | Click starts flare, onset sheet appears with three options; choose; reload; onset still shown; `GET /api/flares/:id` matches |
-| Onset precision mapping | API (Vitest) | today->exact; few_days_ago->approx with today-3; around_date->approx with given date |
-| Malformed onset rejected (400) | API (Vitest) | unknown choice, missing/invalid/future around_date, extra field each return `400` |
-| Mutations and auth rate-limited (429) | API (Vitest) | Exceed configured limit -> `429`; auth per IP, mutation per user |
-| Empty ledger: designed, positive phrasing | Playwright + lint | Empty state renders purpose + action; string scan finds no banned negative phrasing |
-| SEED_DEMO shows real content | Integration | Seed a fresh DB; sign in as demo; ledger has >= 2 past flares, home has an open flare |
-| Missing observability env degrades gracefully | Integration | Start with `SENTRY_DSN`/`UMAMI_*` unset; app serves; no crash; no Umami tag, no Sentry init |
-| No secrets in tracked files; no PII in logs | Test + scan | Grep tracked files for secret patterns; assert logger never receives email/password/token |
-| Loading and error states designed | Playwright | Force a slow/failing fetch; assert skeleton present (layout stable) and product-voice error with retry, no stack trace |
-| Copy sweep | Lint/script | Scan user-visible strings for `—`, `–`, banned vocabulary, negative empty-state phrasing; zero hits |
+| Migration applies on top of 0001; rows valid | Integration (Vitest) | Apply migrations to an empty DB; seed; read/write `impactNote`/`symptomNote` |
+| End-date and treatment-start derivation | Unit (Vitest) | today->exact; few_days_ago->approx today-3; around_date->approx; end-before-onset->error; treatment `unsure`->null |
+| Duration hedging | Unit (Vitest) | approx onset or end -> "about N days"; exact+exact -> "N days" |
+| Close writes everything atomically | API (Vitest) | POST close returns closed flare with end fields, severity, notes, treatments, and derived duration |
+| Already-closed cannot close again | API (Vitest) | Second POST close returns `409`; flare unchanged |
+| Close rejects invalid payloads | API (Vitest) | Bad end choice, end<onset, future date, oversize string, unknown field, >20 treatments each -> `400` |
+| Reopen clears end and keeps treatments | API (Vitest) | PATCH `{reopen:true}` -> `status="open"`, end null, duration null, treatments preserved |
+| Field edit and treatment CRUD persist | API (Vitest) | PATCH flare fields; POST/PATCH/DELETE treatment; GET reflects each change |
+| Legacy onset PATCH still works | API (Vitest) | `{onset_choice, around_date?}` still updates onset and rejects extra fields |
+| Every new route authorized | API (Vitest) | Table-driven: each new route with no session -> `401`; cross-user id -> `404` |
+| Mutations rate-limited | API (Vitest) | Exceeding the per-user limit on close/edit/treatment routes -> `429` |
+| Interview usable at 390px, 44px targets | Playwright (390px) | Open interview; `scrollWidth <= innerWidth`; step controls >= 44px; one question visible per step |
+| Fuzzy answers in one tap; hedged after close | Playwright | Choose "a few days ago" end and "a few days in" treatment; close; ledger shows "about N days" and hedged end |
+| Skip treatments branch | Playwright | "I didn't try anything" closes with zero treatments; treatment sub-form never shown |
+| Edit surface reopen + treatment edit | Playwright | Reopen a closed flare; add/edit/remove a treatment; reload shows the change |
+| Designed loading/empty/error states | Playwright | Force a slow/failed submit; skeleton/in-flight state holds layout; product-voice error with retry; no stack trace |
+| Non-Goal guard | Inspection (Vitest) | Source scan finds no scheduler, reminder, streak, daily check-in, or trend/correlation chart |
+| Copy sweep clean | Lint/script (Vitest) | New user-visible strings carry no `—`/`–`, banned vocabulary, or negative empty-state phrasing |
 
 Every criterion above must have a green automated test before the EPIC is
-`success`. Run the full suite in the foreground to completion.
+`success`. Run the full Vitest and Playwright suites in the foreground to
+completion.
 
 ---
 
 ## 6. Assumptions (resolved, non-blocking)
-- Single staging instance, so an in-process rate limiter and in-DB sessions
-  are sufficient; a shared store is deferred (raise a `requested_task` only
-  if multi-instance staging is later required).
-- "Today" is computed from the server clock in UTC for determinism.
-- The demo user credentials are documented in the README and are for staging
-  demonstration only; they are not a secret and carry no real PII.
-- The `flares` end/severity columns and `treatments` table exist for the
-  reconstruction-ready seed and later EPICs; no EPIC 1 UI flow writes them.
+
+- The close flow is a dedicated `POST /api/flares/:id/close` rather than a
+  mode of PATCH, so the "already closed -> 409" guard and the atomic
+  treatment write live in one obvious place. `PATCH /api/flares/:id` remains
+  the partial-edit and reopen route. This refines the plan's "PATCH edits or
+  closes" sketch without changing behavior; the authoritative EPIC scope
+  fixes the behavior, not the URL.
+- "A few days ago" (end) and "a few days in" (treatment) both anchor to the
+  existing 3-day default, stored `approx` and shown hedged, never as a hard
+  date. This reuses `FEW_DAYS_ANCHOR` for one documented constant.
+- Peak severity keeps the 1..5 scale from the seed; "not sure" stores null.
+  No new scale, no chart.
+- The edit surface (`/flares/:id/edit`) is EPIC 2's minimal edit view. The
+  rich read-only flare detail, ledger presentation, and export are EPIC 3;
+  this EPIC does not build them.
+- Reopening clears the end date and precision because a reopened flare is
+  active again; severity, notes, and treatments are kept as recorded
+  observations.
+- No new environment variables and no LLM are introduced.

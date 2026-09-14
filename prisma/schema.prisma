@@ -39,6 +39,8 @@ model Flare {
   endDate        DateTime?   @map("end_date") @db.Date
   endPrecision   String?     @map("end_precision")
   peakSeverity   Int?        @map("peak_severity") @db.SmallInt
+  impactNote     String?     @map("impact_note")
+  symptomNote    String?     @map("symptom_note")
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
