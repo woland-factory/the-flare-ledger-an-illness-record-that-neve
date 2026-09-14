@@ -264,6 +264,16 @@ input:focus-visible {
   border-bottom: none;
 }
 
+.flare-row-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.flare-row-link:hover .name,
+.flare-row-link:hover {
+  color: var(--accent);
+}
+
 /* Skeletons */
 .skeleton {
   background: linear-gradient(90deg, #eceef1 25%, #f4f6f8 37%, #eceef1 63%);
@@ -291,4 +301,78 @@ input:focus-visible {
 }
 .spacer {
   height: 20px;
+}
+
+/* Interview + editor */
+.step-meta {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+textarea.input {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+/* A pressed/selected choice reads with the accent border. */
+.btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.scale {
+  display: flex;
+  gap: 8px;
+}
+
+.scale .btn {
+  min-width: 0;
+  padding: 12px 0;
+  font-size: 18px;
+}
+
+.scale-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+
+.treat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.treat-item:last-of-type {
+  border-bottom: none;
+}
+
+.treat-item .name {
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.row .btn {
+  width: auto;
+  flex: 1;
+}
+
+.section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 0 0 8px;
 }

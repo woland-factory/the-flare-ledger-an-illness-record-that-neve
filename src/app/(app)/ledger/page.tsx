@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import FlareStarter from "@/components/FlareStarter";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { durationText, onsetText, statusText } from "@/lib/display";
+import { durationTextFor, endText, onsetText, statusText } from "@/lib/display";
 import { serializeFlare } from "@/lib/serialize";
 
 export const dynamic = "force-dynamic";
@@ -37,19 +38,21 @@ export default async function LedgerPage() {
       <p className="lede">Every flare you have logged, newest first.</p>
       <div className="card">
         {flares.map((flare) => {
-          const duration = durationText(flare.durationDays);
+          const duration = durationTextFor(flare);
+          const ended = endText(flare);
           return (
-            <div className="flare-row" key={flare.id}>
+            <Link className="flare-row flare-row-link" key={flare.id} href={`/flares/${flare.id}/edit`}>
               <div>
                 <div style={{ fontWeight: 600 }}>{onsetText(flare)}</div>
                 {duration ? <div className="muted">Lasted {duration}</div> : null}
+                {ended ? <div className="muted">{ended}</div> : null}
               </div>
               <span
                 className={`pill ${flare.status === "open" ? "pill-open" : "pill-closed"}`}
               >
                 {statusText(flare.status)}
               </span>
-            </div>
+            </Link>
           );
         })}
       </div>
