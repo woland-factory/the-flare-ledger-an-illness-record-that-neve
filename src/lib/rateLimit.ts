@@ -21,6 +21,13 @@ export const mutationLimit = () => ({
   windowMs: intEnv("RATE_LIMIT_MUTATION_WINDOW_MS", 60_000),
 });
 
+// Downloading the whole record is heavier than a normal read, so it carries its
+// own generous per-user limit. Safe default, env-tunable, degrades like the rest.
+export const exportLimit = () => ({
+  max: intEnv("RATE_LIMIT_EXPORT_MAX", 30),
+  windowMs: intEnv("RATE_LIMIT_EXPORT_WINDOW_MS", 3_600_000),
+});
+
 export function checkRateLimit(
   key: string,
   max: number,
