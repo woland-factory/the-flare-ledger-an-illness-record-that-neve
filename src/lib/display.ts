@@ -68,3 +68,19 @@ export function severityText(peakSeverity: number | null): string {
 export function statusText(status: string): string {
   return status === "open" ? "Open" : "Closed";
 }
+
+// A compact, scannable summary of a flare's treatments for a ledger row. Names
+// only, treatments that helped first, up to three shown with a "+N more" tail.
+// Returns null for an empty list so the row simply omits the line.
+export function keyTreatmentsText(treatments: TreatmentDTO[]): string | null {
+  if (treatments.length === 0) return null;
+  const helpedFirst = [
+    ...treatments.filter((t) => t.helped === "yes"),
+    ...treatments.filter((t) => t.helped !== "yes"),
+  ];
+  const names = helpedFirst.map((t) => t.name);
+  const shown = names.slice(0, 3);
+  const remaining = names.length - shown.length;
+  const base = shown.join(", ");
+  return remaining > 0 ? `${base} +${remaining} more` : base;
+}

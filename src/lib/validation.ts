@@ -68,6 +68,22 @@ export const treatmentEditSchema = z
   .strict()
   .refine((d) => Object.keys(d).length > 0, { message: "no_fields" });
 
+// The ledger list query: an optional page size and an opaque keyset cursor.
+// Query params arrive as strings, so limit is coerced; unknown params rejected.
+export const flareListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+    before: z.string().min(1).max(80).optional(),
+  })
+  .strict();
+
+// The export format selector. Missing or unknown value is a 400.
+export const exportQuerySchema = z
+  .object({
+    format: z.enum(["json", "csv"]),
+  })
+  .strict();
+
 export type CredentialsInput = z.infer<typeof credentialsSchema>;
 export type OnsetInput = z.infer<typeof onsetSchema>;
 export type TreatmentInput = z.infer<typeof treatmentInputSchema>;
