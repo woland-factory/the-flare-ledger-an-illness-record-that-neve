@@ -5,7 +5,13 @@ import { join } from "node:path";
 // Guards QUALITY BAR §8: user-visible copy must not carry the tells of
 // machine-written text. We scan the UI source and seed copy for em-dashes,
 // banned vocabulary, and negative empty-state phrasing.
-const ROOTS = ["src/app", "src/components", "src/lib/seed.ts", "src/lib/display.ts"];
+const ROOTS = [
+  "src/app",
+  "src/components",
+  "src/lib/seed.ts",
+  "src/lib/display.ts",
+  "src/lib/reconstruction.ts",
+];
 
 const BANNED_WORDS = [
   "seamlessly", "effortlessly", "unlock", "elevate", "empower", "leverage",

@@ -58,7 +58,7 @@ export function helpedText(helped: string | null): string {
   return "Not sure";
 }
 
-// Severity is one value with a word anchor, never a chart. Null means the user
+// Severity is one value with a word anchor, never a graph. Null means the user
 // answered "not sure".
 export function severityText(peakSeverity: number | null): string {
   if (peakSeverity == null) return "Severity not recorded";

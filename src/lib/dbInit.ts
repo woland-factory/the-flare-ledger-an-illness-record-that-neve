@@ -56,7 +56,7 @@ export async function ensureSchema(): Promise<void> {
       break;
     } catch (err) {
       if (attempt >= 10) throw err;
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((r) => setTimeout(r, 900));
     }
   }
 

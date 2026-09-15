@@ -12,6 +12,6 @@ beforeEach(async () => {
   resetRateLimits();
   const { prisma } = await import("@/lib/db");
   await prisma.$executeRawUnsafe(
-    "TRUNCATE users, sessions, flares, treatments RESTART IDENTITY CASCADE",
+    "TRUNCATE users, sessions, flares, treatments, appointments RESTART IDENTITY CASCADE",
   );
 });

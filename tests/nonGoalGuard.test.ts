@@ -5,7 +5,7 @@ import { join } from "node:path";
 // The product's whole thesis is that it never nags on a schedule and never
 // charts the user's data. This guard fails loudly if either paradigm sneaks
 // into the app or component source, so a later change cannot quietly betray it.
-const ROOTS = ["src/app", "src/components"];
+const ROOTS = ["src/app", "src/components", "src/lib"];
 
 // Mechanical markers: scheduling primitives and charting libraries. These can
 // only appear in real code, never in marketing prose, so they are scanned
@@ -22,6 +22,10 @@ const MECHANICAL: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /\bfacet(ing|s)?\b/i, label: "faceting control" },
   { pattern: /filter(By|Flares|Controls?)/i, label: "ledger filter control" },
   { pattern: /share[_-]?token|shareToken|public[_-]?link|clinician[_-]?view/i, label: "cross-user or share read path" },
+  // EPIC 4 boundary: the pre-appointment reconstruction is templated over
+  // stored rows by pure functions. Any LLM plumbing anywhere in the app
+  // source betrays that, so the markers fail the suite mechanically.
+  { pattern: /LLM_GATEWAY_URL|LLM_API_KEY|\bopenai\b|\banthropic\b|chat\/completions|\/v1\/messages/i, label: "LLM call in a no-LLM product" },
 ];
 
 // Paradigm markers: a streak, daily check-in, reminder, or trend/correlation

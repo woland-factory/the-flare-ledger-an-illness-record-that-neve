@@ -7,7 +7,16 @@ describe("schema migration", () => {
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
     );
     const names = rows.map((r) => r.table_name);
-    expect(names).toEqual(expect.arrayContaining(["users", "sessions", "flares", "treatments"]));
+    expect(names).toEqual(
+      expect.arrayContaining(["users", "sessions", "flares", "treatments", "appointments"]),
+    );
+  });
+
+  it("creates the appointments composite index", async () => {
+    const rows = await prisma.$queryRawUnsafe<{ indexname: string }[]>(
+      "SELECT indexname FROM pg_indexes WHERE tablename = 'appointments'",
+    );
+    expect(rows.map((r) => r.indexname)).toContain("appointments_user_visit_idx");
   });
 
   it("creates the ledger indexes on flares", async () => {

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { daysBetween, parseIsoDate, todayUtc } from "./date";
+import { snapshotTreatmentSchema } from "./reconstruction";
 
 export const credentialsSchema = z
   .object({
@@ -84,9 +86,99 @@ export const exportQuerySchema = z
   })
   .strict();
 
+// A visit date must be a real calendar date within a year either way of
+// today: enough to log a visit just past or a year ahead, tight enough to
+// catch typos.
+const visitDateSchema = z.string().refine(
+  (v) => {
+    const d = parseIsoDate(v);
+    return d !== null && Math.abs(daysBetween(todayUtc(), d)) <= 365;
+  },
+  { message: "bad_visit_date" },
+);
+
+export const appointmentCreateSchema = z
+  .object({
+    visit_date: visitDateSchema,
+    specialty: z.string().trim().min(1).max(80).optional(),
+  })
+  .strict();
+
+const isoDayString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const precisionSchema = z.enum(["exact", "approx"]);
+const severitySchema = z.number().int().min(1).max(5).nullable();
+
+const setVisitSchema = z
+  .object({
+    op: z.literal("set_visit"),
+    visit_date: visitDateSchema.optional(),
+    specialty: z.string().trim().min(1).max(80).nullable().optional(),
+  })
+  .strict()
+  .refine((d) => d.visit_date !== undefined || d.specialty !== undefined, {
+    message: "no_fields",
+  });
+
+// Shared field rules for editing or adding a snapshot flare. Cross-field
+// rules that need the merged flare (order, future dates) live in
+// applyCorrection; these keep the shapes tight at the boundary.
+const setFlareSchema = z
+  .object({
+    op: z.literal("set_flare"),
+    key: z.string().min(1).max(80),
+    onset_date: isoDayString.optional(),
+    onset_precision: precisionSchema.optional(),
+    end_date: isoDayString.nullable().optional(),
+    end_precision: precisionSchema.optional(),
+    peak_severity: severitySchema.optional(),
+    note: z.string().max(300).nullable().optional(),
+    treatments: z.array(snapshotTreatmentSchema).max(20).optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 2, { message: "no_fields" })
+  .refine((d) => (d.onset_date === undefined) === (d.onset_precision === undefined), {
+    message: "onset_precision_required",
+  })
+  .refine((d) => (typeof d.end_date === "string") === (d.end_precision !== undefined), {
+    message: "end_precision_required",
+  });
+
+const addFlareSchema = z
+  .object({
+    op: z.literal("add_flare"),
+    onset_date: isoDayString,
+    onset_precision: precisionSchema,
+    end_date: isoDayString.nullable().optional(),
+    end_precision: precisionSchema.optional(),
+    peak_severity: severitySchema.optional(),
+    note: z.string().max(300).nullable().optional(),
+    treatments: z.array(snapshotTreatmentSchema).max(20).optional(),
+  })
+  .strict()
+  .refine((d) => (typeof d.end_date === "string") === (d.end_precision !== undefined), {
+    message: "end_precision_required",
+  });
+
+const removeFlareSchema = z
+  .object({
+    op: z.literal("remove_flare"),
+    key: z.string().min(1).max(80),
+  })
+  .strict();
+
+// One validated correction per request: one tap, one save.
+export const appointmentCorrectionSchema = z.union([
+  setVisitSchema,
+  setFlareSchema,
+  addFlareSchema,
+  removeFlareSchema,
+]);
+
 export type CredentialsInput = z.infer<typeof credentialsSchema>;
 export type OnsetInput = z.infer<typeof onsetSchema>;
 export type TreatmentInput = z.infer<typeof treatmentInputSchema>;
 export type CloseInput = z.infer<typeof closeSchema>;
 export type FlareEditInput = z.infer<typeof flareEditSchema>;
 export type TreatmentEditInput = z.infer<typeof treatmentEditSchema>;
+export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
+export type AppointmentCorrectionInput = z.infer<typeof appointmentCorrectionSchema>;
