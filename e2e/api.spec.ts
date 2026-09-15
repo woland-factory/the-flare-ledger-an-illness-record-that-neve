@@ -79,6 +79,38 @@ test("another user's flare is reported as not found (404)", async ({ playwright 
   await b.dispose();
 });
 
+test("GET /api/flares rejects bad query params with 400", async ({ request }) => {
+  await signup(request);
+  const bad = [
+    "limit=0", // below the 1..50 range
+    "limit=51", // above the 1..50 range
+    "before=not-a-cursor", // malformed keyset cursor
+    "sort=asc", // unknown param, schema is strict
+  ];
+  for (const query of bad) {
+    const res = await request.get(`/api/flares?${query}`);
+    expect(res.status(), query).toBe(400);
+  }
+});
+
+test("a user's flare never appears in another user's list", async ({ playwright }) => {
+  const a = await playwright.request.newContext();
+  const b = await playwright.request.newContext();
+  await signup(a);
+  await signup(b);
+
+  const created = await b.post("/api/flares");
+  const flareId = (await created.json()).flare.id;
+
+  const list = await a.get("/api/flares");
+  expect(list.status()).toBe(200);
+  const ids = (await list.json()).flares.map((f: { id: string }) => f.id);
+  expect(ids).not.toContain(flareId);
+
+  await a.dispose();
+  await b.dispose();
+});
+
 test("start a flare, then set and persist the onset", async ({ request }) => {
   await signup(request);
 
