@@ -47,9 +47,15 @@ export default async function HomePage() {
           </div>
         ))}
 
-        <p className="muted" style={{ textAlign: "center" }}>
+        <p
+          className="muted"
+          style={{ display: "flex", justifyContent: "center", gap: 20 }}
+        >
           <Link className="link-quiet" href="/ledger">
             See your ledger
+          </Link>
+          <Link className="link-quiet" href="/appointments">
+            Doctor visit coming up?
           </Link>
         </p>
       </div>

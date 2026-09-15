@@ -377,6 +377,69 @@ textarea.input {
   margin: 0 0 8px;
 }
 
+/* Pre-appointment timeline */
+.headline {
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.3;
+  margin: 0 0 6px;
+}
+
+.snap-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+  min-height: 44px;
+  cursor: pointer;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.snap-row:last-child {
+  border-bottom: none;
+}
+
+.snap-row:hover {
+  color: var(--accent);
+}
+
+.snap-line {
+  display: block;
+}
+
+.sheet-scroll {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* The one-pager */
+.onepage-headline {
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1.3;
+  margin: 10px 0 14px;
+}
+
+.onepage-flare {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.onepage-flare:last-of-type {
+  border-bottom: none;
+}
+
+.onepage-footer {
+  margin-top: 14px;
+}
+
 /* Printable full record */
 .print-flare {
   padding: 12px 0;
@@ -408,6 +471,31 @@ textarea.input {
     padding: 0;
   }
   .print-flare {
+    border-bottom: 1px solid #cccccc;
+  }
+  /* The one-pager prints as one compact A4/Letter page: tight margins,
+     small body type, and blocks that never split across pages. */
+  @page {
+    margin: 12mm;
+  }
+  .onepage {
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+  .onepage h1 {
+    font-size: 20px;
+    margin-bottom: 2px;
+  }
+  .onepage .onepage-headline {
+    font-size: 15px;
+    margin: 6px 0 8px;
+  }
+  .onepage .muted {
+    color: #333333;
+    font-size: 11.5px;
+  }
+  .onepage-flare {
+    padding: 6px 0;
     border-bottom: 1px solid #cccccc;
   }
 }

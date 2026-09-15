@@ -1,4 +1,4 @@
-# EPIC SPEC — The ledger and export
+# EPIC SPEC: Pre-appointment reconstruction (signature moment)
 
 ## Quality differentiator (this EPIC is held to it)
 
@@ -6,93 +6,93 @@
 person than any other route to a doctor-ready illness history, measured in
 minutes per flare instead of entries per day.
 
-**What it demands of THIS EPIC.** The ledger and export are where the effort
-already spent turns into something the user can carry out the door. The user
-put minutes into each flare; this EPIC must return the whole multi-year
-record with zero extra composition. Browsing is scan-only (the whole flare
-readable in a row, no drilling required to see duration, severity, and what
-helped), and export is one tap to a file a doctor or a spreadsheet opens
-cleanly. Anything that makes the user assemble, reformat, or hand-copy their
-own history is a defect against this differentiator, not just the baseline
-bar. The record is theirs and portable, or the promise is broken.
+**What it demands of THIS EPIC.** This is the moment the whole product exists
+for: the user taps "Doctor visit coming up", and the app hands back a drafted
+since-last-visit timeline they only correct, never compose. Every screen in
+this flow is judged by "did this ask the user for one gram more than it had
+to?" The draft must arrive already filled in from stored data; the correction
+pass must be tap-to-fix, not re-entry; and the output must be one page a
+rheumatologist can read across a desk. If the user has to write a paragraph,
+re-type a date the app already knows, or assemble anything by hand, this EPIC
+has failed its own differentiator.
 
 ---
 
 ## 1. Scope
 
 ### In scope
-- **A chronological ledger** of every flare, newest-first, that does not slow
-  as flares accumulate. Each row is scannable: onset to end, duration, peak
-  severity, and the key treatments, without opening the flare.
-- **Reaching every flare**: the ledger is paginated (keyset "Load older") so
-  a multi-year record lists all flares while each query stays bounded and
-  index-backed. First page renders server-side for a fast first paint.
-- **Flare detail, editable**: tapping a row opens the flare's full interview
-  data (end, duration, severity, every treatment with start and whether it
-  helped, impact and symptom notes), all correctable. This reuses the edit
-  surface delivered in EPIC 2; this EPIC confirms it renders the complete
-  record and is reached from every ledger row.
-- **Export of the whole record**:
-  - `GET /api/export?format=json` returns a structured JSON document of all
-    the user's flares and treatments.
-  - `GET /api/export?format=csv` returns a flat CSV, one row per treatment
-    (a flare with no treatments still gets a row), safe to open in a
-    spreadsheet.
-  - A **printable full-record view** (`/ledger/print`) that renders the whole
-    record cleanly with print CSS and no app chrome.
-- An **export surface** on the ledger: subordinate to the list, offering
-  Download JSON, Download CSV, and Print, with product-voice feedback and
-  error handling.
-- Designed empty, loading, and error states for every new or changed surface;
-  mobile-first at 390px with no horizontal scroll; a copy sweep of every new
-  user-visible string.
+- **A new `Appointment` entity** (forward-only migration) holding a visit
+  date, an optional specialty label, and a structured reconstruction
+  snapshot (JSONB).
+- **Creating an appointment** from a "Doctor visit coming up" action: the
+  server deterministically drafts a timeline snapshot of the flares since
+  the user's previous appointment (all recorded flares on the first), built
+  only from stored `flares` and `treatments` rows. No model call anywhere.
+- **Templated prose over the snapshot**: a data-built headline ("3 flares
+  since March. Longest about 12 days. Naproxen started on day one, that
+  flare was about half as long."), an honest coverage line ("Built from 3
+  recorded flares, not a daily diary."), and compact per-flare lines, all
+  produced by pure functions with exact, testable rules. Uncertainty stays
+  hedged ("about 12 days"), never flattened into false precision.
+- **The correction pass**: a screen where the user fixes any drafted value
+  (dates with their precision, severity, treatments, the note) and adds a
+  flare that was never logged, from inside the same screen. Every
+  correction saves to the appointment snapshot via `PATCH`.
+- **A one-page print view** per appointment: prints to a single clean page
+  on A4 and Letter with print CSS, no app chrome, readable across a desk.
+- **Entry points**: a quiet "Doctor visit coming up?" link on the home
+  screen, and an appointments screen listing past visits with one primary
+  create action and a designed empty state.
+- Authorization, Zod validation, and rate limiting on every new route;
+  designed empty, loading, and error states; the whole flow legible at
+  390px; a mechanical copy sweep of every new user-visible string.
+- **Non-goal guards extended**: the non-goal test also fails on any LLM
+  marker in the app source, proving the reconstruction path is templated.
 
-### Out of scope (build in later EPICs, not here)
-- **Pre-appointment reconstruction** and the one-page since-last-visit
-  timeline with its data-built headline and correction pass (**EPIC 4**). The
-  printable output here is a plain full-record printout. It does NOT
-  synthesize a headline, does NOT scope to "since last visit", and does NOT
-  create an appointment or a correction pass. Building any of that here is
-  drift into EPIC 4's signature moment.
+### Out of scope (later EPICs or never)
 - The guided first-run overlay, PWA install, and the covenant nudge
-  (**EPIC 5**).
+  (**EPIC 5**). Do not build any onboarding here.
 - The product-wide polish audit (**EPIC 6**).
-- A settings screen and profile/condition editing beyond what already exists
-  (`GET /api/me`); the plan houses export in settings, but this EPIC places
-  the export actions on the ledger and does not build a settings screen.
+- Editing ledger flares from the correction pass. Corrections live on the
+  appointment snapshot only (see §3.2 and Assumptions); the ledger editor
+  from EPIC 2 stays the way to change the underlying record.
+- Sharing, emailing, or exporting the one-pager beyond printing it. The
+  whole-record export from EPIC 3 is untouched.
+- Deleting appointments. A wrong visit date or specialty is correctable via
+  `PATCH`; a delete surface is not required by any criterion.
 
-### Non-Goals (binding — a defect if built)
-- **No filtering dashboards.** No filter controls, no search box, no
-  faceting, no "flares by condition/severity/date-range" pickers. The ledger
-  is one newest-first list plus "Load older".
-- **No charts, graphs, or trend/correlation views** of any kind (severity
-  over time, treatment effectiveness plots, calendars). Severity stays a
-  single value per flare, shown as text.
-- **No cross-user or shared views.** Every query is scoped to the signed-in
-  user. No public links, no share tokens, no clinician view.
-- **No new entities.** No appointment, no saved export, no report record. The
-  ledger and export read the existing `flares` and `treatments` only.
-- **No reminders, scheduled prompts, streaks, or nudges** anywhere (the
-  standing product paradigm ban; the covenant nudge is EPIC 5's job).
-- **No LLM.** Export and print are deterministic serialization of stored
-  data. No model call, no key-entry surface.
+### Non-Goals (binding, a defect if built)
+- **No AI-written narrative.** No LLM call, no gateway client, no
+  key-entry surface, no "improve wording" button. All prose is templated
+  over structured data by pure functions in `src/lib/reconstruction.ts`.
+- **No calendar or weather ingestion.** Nothing in this flow reads any
+  external source; the draft is built from this user's stored rows only.
+- **No clinician portal.** No share link, no public route, no token access.
+  The print view is a signed-in page the user prints themselves.
+- **No scheduled prompts, reminders, streaks, charts, or dashboards**
+  (standing product bans; the existing guard test must keep passing).
 
 ---
 
-## 2. First-run and the quality bar (read before building)
+## 2. The signature moment (read before building)
 
-The QUALITY BAR requires a guided first run; the plan assigns that overlay to
-**EPIC 5**. Do not build it here. In this EPIC the bar is met by the surfaces
-being self-evident:
-- The ledger's existing empty state already says what the screen is for and
-  offers the first action (start a flare). Keep it, and keep it positive.
-- Export actions read plainly ("Download JSON", "Download CSV", "Print") and
-  are visibly subordinate to the list, so a user sees their record first and
-  the way to carry it out second.
+The AMBITION BAR names this EPIC's deliverable as the product's signature:
+the user walks in and reads one page aloud. Concretely, that means:
 
-Building the EPIC 5 overlay now is drift. A confusing ledger or an export a
-spreadsheet chokes on is a defect. Deliver a self-evident, scan-only ledger
-and a clean file.
+1. The headline is real, built from the user's own rows, and lands within
+   seconds of tapping "Doctor visit coming up". On staging, the seeded demo
+   user must produce exactly this headline on their first appointment:
+   "3 flares recorded. Longest about 12 days. Naproxen started on day one,
+   that flare was about half as long." (The existing seed data already
+   supports it; verify, do not reshape the seed beyond what §3.9 allows.)
+2. The user corrects, never composes. Every drafted value is editable in
+   place with at most a tap and a small input. There is no blank text area
+   asking them to describe their illness.
+3. Coverage is stated plainly. The page says what it was built from and
+   never pretends the gaps are absence of disease.
+
+If an implementation choice trades any of these away for convenience, it is
+the wrong choice.
 
 ---
 
@@ -100,438 +100,561 @@ and a clean file.
 
 Build on the existing stack unchanged: Next.js App Router (RSC screens +
 Route Handlers under `src/app/api/*`), PostgreSQL 16 with Prisma, Zod at
-every boundary, argon2id sessions looked up server-side on every protected
-request, the in-process fixed-window rate limiter, Sentry/Umami gated on env.
-Reuse the existing helpers rather than re-inventing them: `requireUser`,
-`guardMutation`, `errorResponse`/`jsonResponse` (`src/lib/api.ts`); the DTOs
-and `serializeFlare`/`serializeTreatment` (`src/lib/serialize.ts`); the
-hedged text helpers `onsetText`, `endText`, `durationTextFor`,
-`treatmentStartText`, `helpedText`, `severityText`, `statusText`
-(`src/lib/display.ts`); the date helpers in `src/lib/date.ts`; and the plain
-CSS class vocabulary already used by the ledger and editor (`btn`,
-`btn-primary`, `btn-secondary`, `btn-ghost`, `card`, `stack`, `row`, `pill`,
-`muted`, `lede`, `empty`, `field`, `input`, `section-label`, `link-quiet`).
+every boundary, cookie sessions resolved server-side on every protected
+request, the in-process rate limiter, Sentry/Umami gated on env. Reuse the
+existing helpers: `requireUser`, `guardMutation`, `errorResponse`,
+`jsonResponse` (`src/lib/api.ts`); `getCurrentUser` for RSC pages;
+`parseIsoDate`, `toIsoDate`, `todayUtc`, `addDays`, `daysBetween`,
+`formatExact`, `formatMonthDay` (`src/lib/date.ts`); the hedged display
+helpers (`src/lib/display.ts`); `serializeFlare` DTOs (`src/lib/serialize.ts`);
+and the CSS vocabulary already in `globals.css` (`btn`, `btn-primary`,
+`btn-secondary`, `btn-ghost`, `card`, `stack`, `row`, `pill`, `muted`,
+`lede`, `empty`, `field`, `input`, `sheet`, `no-print`, `form-error`).
 
-The DTO layer already carries everything this EPIC displays: `FlareDTO`
-includes `peakSeverity`, `durationDays`, `impactNote`, `symptomNote`, and an
-optional `treatments[]`; the display helpers already hedge duration and end.
-This EPIC adds no new stored fields. The work is the ledger presentation,
-pagination, and the export/print outputs.
+No new frameworks, no state library, no PDF library, no date library.
+Printing is browser print with `@media print` CSS, exactly like
+`/ledger/print`.
 
 ### 3.1 Files and modules
 
 Create:
 ```
-src/lib/csv.ts                          # RFC-4180 CSV rows + formula-injection guard; flaresToCsv()
-src/lib/export.ts                       # build the JSON export payload; shared flare-load query
-src/app/api/export/route.ts             # GET: json | csv download of the whole record
-src/app/(app)/ledger/print/page.tsx     # printable full-record view (RSC), print CSS, no chrome
-src/components/LedgerPager.tsx          # "Load older" client control that appends pages
-src/components/ExportActions.tsx        # client: download JSON/CSV + print, with error state
-tests/csv.test.ts                       # quoting, injection guard, one-row-per-treatment, zero-treatment
-tests/export.test.ts                    # JSON payload shape; scoped-to-one-user builder behavior
-e2e/ledger.spec.ts                      # enriched rows, pagination, 390px, row -> detail link
-e2e/export.spec.ts                      # JSON/CSV download valid + only own data; print view; 401; 429
+prisma/migrations/0003_appointments/migration.sql   # forward-only, §3.3
+src/lib/reconstruction.ts        # snapshot types + draft builder + prose + correction apply
+src/app/api/appointments/route.ts        # POST create-and-draft, GET list
+src/app/api/appointments/[id]/route.ts   # GET one, PATCH corrections
+src/app/(app)/appointments/page.tsx          # visits list + create (RSC)
+src/app/(app)/appointments/[id]/page.tsx     # correction pass (RSC shell)
+src/app/(app)/appointments/[id]/print/page.tsx  # the one-pager (RSC)
+src/components/AppointmentCreator.tsx    # client: date + optional specialty, POST, redirect
+src/components/SnapshotEditor.tsx        # client: timeline rows, edit sheet, add missed flare
+tests/reconstruction.test.ts     # draft rules, prose determinism, hedging, bands, apply()
+e2e/appointments.spec.ts         # API contract: create/draft/range/corrections/authz/limits
+e2e/reconstruction.spec.ts       # UI flow, signature headline, print one-page, 390px
 ```
 
 Modify:
 ```
-src/lib/validation.ts       # add flareListQuerySchema (limit, before) and exportQuerySchema (format)
-src/lib/display.ts          # add keyTreatmentsText(treatments) for the compact row summary
-src/lib/rateLimit.ts        # add exportLimit() config (env-tunable) reusing checkRateLimit
-src/app/api/flares/route.ts # GET: keyset pagination (limit, before) + include treatments + nextCursor
-src/app/(app)/ledger/page.tsx  # enrich rows (severity + key treatments); first page + pager; export section
-src/app/(app)/loading.tsx      # confirm the ledger skeleton holds layout (already route-level)
-src/app/globals.css         # @media print rules; any row/export-section classes needed
-README.md                   # document export formats, the print view, pagination; keep it stranger-readable
-tests/copy.test.ts          # ROOTS already cover src/app + src/components; confirm new files are scanned
+prisma/schema.prisma            # Appointment model
+src/lib/validation.ts           # appointmentCreateSchema, appointmentCorrectionSchema
+src/app/(app)/home/page.tsx     # quiet link "Doctor visit coming up?" next to the ledger link
+src/app/globals.css             # one-pager print styles (.onepage, compact print type)
+tests/nonGoalGuard.test.ts      # add src/lib to ROOTS; add LLM mechanical markers
+tests/copy.test.ts              # add src/lib/reconstruction.ts to ROOTS
+tests/validation.test.ts        # cases for the two new schemas
+README.md                       # one short section: the pre-appointment one-pager
 ```
 
-Do not introduce new frameworks, a state library, a chart library, a CSV
-package, or a design system. CSV is a few lines of quoting; write it in
-`src/lib/csv.ts`.
+`SnapshotEditor` may be split into smaller client components (a row, an edit
+sheet, an add-flare sheet) if that reads better; the sheet interaction should
+reuse the `sheet` / `sheet-scrim` pattern from `OnsetSheet.tsx`.
 
-### 3.2 Data model
+### 3.2 Snapshot: the appointment owns its account
 
-**No migration.** Every field the ledger and export read already exists
-(`flares.status/onset*/end*/peak_severity/impact_note/symptom_note`, the
-whole `treatments` table). The `flares` table already has the
-`(user_id, created_at desc)` index that backs newest-first pagination, and
-`treatments` has its `flare_id` index that backs the batched treatment load.
-Adding a migration here is drift.
+The reconstruction snapshot is a self-contained JSONB document on the
+appointment row. Drafting copies the relevant flare data into it; from then
+on the snapshot is the single thing the correction pass edits and the
+one-pager renders. Corrections never write back to `flares` or `treatments`
+(the ledger stays the raw record; the snapshot is the account prepared for
+one visit). A flare added during correction exists in the snapshot only.
 
-### 3.3 Ledger query and keyset pagination
+```ts
+// src/lib/reconstruction.ts
+export type SnapshotTreatment = {
+  name: string;                      // 1..120 chars
+  startedOn: string | null;          // ISO date
+  startedPrecision: "exact" | "approx" | null;
+  helped: "yes" | "no" | "unsure" | null;
+};
 
-The ledger must list all flares without a query that slows as the record
-grows, and without an N+1 over treatments.
+export type SnapshotFlare = {
+  key: string;          // drafted: the source flare id; added: a server uuid
+  source: "drafted" | "added";
+  onsetDate: string;                 // ISO date
+  onsetPrecision: "exact" | "approx";
+  endDate: string | null;            // null = still going (open)
+  endPrecision: "exact" | "approx" | null;
+  peakSeverity: number | null;       // 1..5
+  note: string | null;               // <= 300 chars, see drafting rule
+  treatments: SnapshotTreatment[];   // <= 20
+};
 
-**Ordering.** Newest-first by `created_at` descending, exactly as today,
-backed by the existing `(user_id, created_at desc)` index. (Ordering by
-onset would need a new index and can reorder backdated flares; keep
-`created_at desc` for consistency with EPIC 1/2 and the index. Onset-based
-sorting is out of scope.)
-
-**Treatments per row.** Load with a single batched relation query, not a
-per-row lookup: `include: { treatments: true }` on the `findMany`. Prisma
-issues one `IN (...)` query against the `treatments.flare_id` index, so the
-cost is two indexed queries regardless of row count. Never query treatments
-inside a row loop.
-
-**Page size.** `PAGE = 25` rows per page (a constant in the ledger/route).
-
-**First page (server-rendered).** The ledger RSC queries the first page
-directly for a fast first paint: `take: PAGE + 1` (the extra row only tells
-us whether more exist; it is not rendered). If `PAGE + 1` rows come back,
-render `LedgerPager` seeded with the cursor of the last shown row.
-
-**"Load older" (client).** `LedgerPager` calls the extended
-`GET /api/flares?limit=25&before=<cursor>`, appends the returned rows, and
-updates the cursor from `nextCursor`. When `nextCursor` is null, hide the
-button. Each press gives a pressed/in-flight state within 100ms and a
-product-voice error with a retry on failure.
-
-**Cursor.** An opaque string `"<createdAtIso>_<id>"` returned as
-`nextCursor`. The server keyset predicate is
-`created_at < cursorDate OR (created_at = cursorDate AND id < cursorId)`,
-ordered `created_at desc, id desc`, so ties on `created_at` never drop or
-duplicate a row. An unparseable `before` is rejected `400`.
-
-### 3.4 Extended list endpoint (`GET /api/flares`)
-
-This EPIC deliberately changes EPIC 2's "lean, no treatments" list contract:
-the ledger row needs key treatments, and the batched relation load is cheap.
-
-- Auth server-side via `requireUser`; no session -> `401`.
-- Query params validated with `flareListQuerySchema` (see §3.7):
-  - `limit`: optional integer 1..50, default 25.
-  - `before`: optional cursor string; invalid format -> `400`.
-- Returns `200 { flares: FlareDTO[] /* with treatments */, nextCursor: string | null }`.
-- `flares` are the caller's only, newest-first, keyset-paginated per §3.3,
-  each serialized with its treatments (ordered by `serializeFlare`).
-- `nextCursor` is the cursor of the last returned row when a further page
-  may exist, else null.
-- It is a read: no `guardMutation`. It stays fast (two indexed queries).
-
-### 3.5 Export endpoint (`GET /api/export?format=json|csv`)
-
-One endpoint, two serializations, the **whole** record (not the 50/paged
-cap — export must be complete).
-
-- Auth server-side via `requireUser`; no session -> `401`.
-- `format` validated with `exportQuerySchema`: must be `"json"` or `"csv"`.
-  Missing or unknown -> `400` in product voice.
-- Light per-user export rate limit via `exportLimit()` + `checkRateLimit`
-  keyed `export:<userId>`; over the limit -> `429` with the existing
-  "You're going quickly. Try again in a minute." message. Generous default
-  (for example 30/hour), env-tunable, degrading like the other limits.
-- Loads all of the caller's flares **with treatments**, ordered
-  `onset_date asc` (a record reads best oldest-first as a timeline), scoped
-  `where: { userId: user.id }`. This is the only place ordering differs from
-  the ledger, and it is intentional.
-
-**JSON (`format=json`).** Built in `src/lib/export.ts`, reusing
-`serializeFlare` so the shape matches the API:
-```json
-{
-  "version": 1,
-  "exportedAt": "<server ISO timestamp>",
-  "account": { "email": "<user email>", "conditionLabel": "<label|null>" },
-  "flares": [ /* FlareDTO with treatments, onset-ascending */ ]
-}
+export type Snapshot = {
+  version: 1;
+  rangeStart: string | null;  // previous appointment's visit date, null on first
+  truncated: boolean;         // true when the range held more than the cap
+  flares: SnapshotFlare[];    // onset ascending, <= 50
+};
 ```
-- `Content-Type: application/json; charset=utf-8`.
-- `Content-Disposition: attachment; filename="flare-ledger-<YYYY-MM-DD>.json"`.
-- The document must `JSON.parse` cleanly and contain only this user's flares.
 
-**CSV (`format=csv`).** Built in `src/lib/csv.ts`. One header row, then one
-row per treatment; a flare with zero treatments produces a single row with
-the treatment columns empty. Columns, in order:
+Derived, never stored: a flare is open iff `endDate` is null; duration is
+`daysBetween(onset, end) + 1` for closed flares (same formula as
+`serializeFlare`). Storing no derived values means a corrected date can
+never leave a stale duration or status behind.
+
+A Zod `snapshotSchema` in `validation.ts` (or exported from
+`reconstruction.ts`) validates the document shape; the server validates the
+snapshot after every mutation before persisting it. `version: 1` makes any
+later shape change a readable migration, not a guess.
+
+### 3.3 Data model (forward-only migration `0003_appointments`)
+
+```sql
+CREATE TABLE appointments (
+  id          uuid PRIMARY KEY,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  visit_date  date NOT NULL,
+  specialty   text,
+  snapshot    jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX appointments_user_visit_idx
+  ON appointments (user_id, visit_date DESC, created_at DESC);
 ```
-onset_date, onset_precision, end_date, end_precision, duration_days,
-peak_severity, status, impact_note, symptom_note,
-treatment_name, treatment_started_on, treatment_started_precision,
-treatment_helped, treatment_note
-```
-- **RFC 4180 quoting.** A field containing a comma, double-quote, CR, or LF
-  is wrapped in double-quotes with internal quotes doubled. Rows joined with
-  `\r\n`.
-- **Formula-injection guard (security).** Any field whose first character is
-  `=`, `+`, `-`, `@`, tab, or CR is prefixed with a single quote `'` before
-  quoting, so a spreadsheet does not execute it. Treatment names and notes
-  are user-controlled, so this is mandatory, not optional.
-- `Content-Type: text/csv; charset=utf-8`.
-- `Content-Disposition: attachment; filename="flare-ledger-<YYYY-MM-DD>.csv"`.
-- The file must open in a spreadsheet with columns aligned and contain only
-  this user's data.
 
-No PII in logs on either path: never log note text, treatment names, or
-email; log the user by id only.
+Prisma model `Appointment` mirrors it (`@@map("appointments")`, `Json`
+snapshot field, relation to `User` with cascade, the composite index). No
+change to `flares` or `treatments`.
 
-### 3.6 Printable view (`/ledger/print`)
+### 3.4 Drafting rules (deterministic, in `src/lib/reconstruction.ts`)
 
-A clean, print-optimized rendering of the whole record. RSC under the `(app)`
-group so it inherits auth.
+`buildDraftSnapshot(flares, rangeStart)` is a pure function; the route loads
+the rows and passes them in, so the builder is unit-testable without a
+database.
 
-- Server-side: `getCurrentUser()`; if absent, `redirect("/signin")`. Load all
-  the user's flares with treatments, onset-ascending, scoped by `userId`.
-- Renders each flare as a compact block: onset-to-end line, hedged duration,
-  severity (`severityText`), each treatment (`treatmentStartText` +
-  `helpedText`), and impact/symptom notes when present. Reuse the display
-  helpers so hedging stays honest ("about 6 days", never a false hard date).
-- On-screen controls (a "Print" button and a "Back to ledger" link) carry a
-  `no-print` class. Print CSS (`@media print` in `globals.css`) hides the app
-  nav/chrome and the `no-print` controls, sets readable typography, and adds
-  `break-inside: avoid` per flare so a flare is not split across pages.
-- The "Print" button is a tiny client component (or `ExportActions`' print
-  action) calling `window.print()`; the page also prints correctly straight
-  from the browser.
-- Empty record: a positive line ("Start a flare to build your record.") and a
-  link back, never a blank page.
-- This view is a plain full-record printout. It has no headline synthesis, no
-  since-last-visit scoping, no correction pass. Those are EPIC 4.
+- **Previous appointment.** When creating an appointment with visit date V,
+  the previous appointment is the caller's existing appointment with the
+  greatest `visit_date <= V`, ties broken by `created_at` (latest wins).
+  `rangeStart` = its `visit_date`. No such appointment: `rangeStart = null`
+  (first visit, all-time draft).
+- **Which flares are in range.** All-time when `rangeStart` is null.
+  Otherwise a flare is included iff it is open (`end_date IS NULL`) or its
+  `end_date >= rangeStart`: anything still active on or after the last
+  visit day belongs in "since last visit". Query scoped
+  `where: { userId: user.id }`, `include: { treatments: true }`, ordered
+  `onsetDate asc, createdAt asc` (matches `loadUserFlares`). The range
+  filter runs in the query, not in JS.
+- **Cap.** The snapshot holds at most 50 flares. When the range has more,
+  keep the 50 with the newest onsets (still stored onset-ascending) and set
+  `truncated: true`; the coverage line then says so. This bounds the
+  document, the correction pass, and the page.
+- **Per-flare copy.** `key` = flare id, `source: "drafted"`, dates and
+  precisions copied as ISO strings, `peakSeverity` copied, treatments
+  copied as `SnapshotTreatment` (name, startedOn, startedPrecision, helped)
+  in the same order `serializeFlare` produces (start ascending, unrecorded
+  last), capped at 20.
+- **Note drafting.** `note` = `impactNote` and `symptomNote` joined with a
+  single space (skipping null/empty), truncated at 300 characters on a word
+  boundary with a trailing ellipsis character when cut. The user can
+  rewrite it in the correction pass; the one-pager needs a line, not an
+  essay.
 
-### 3.7 Validation (`src/lib/validation.ts`)
+Determinism requirement: same input rows, same output snapshot, byte for
+byte. No `Date.now()` inside the builder (the route passes `todayUtc()`
+where needed), no randomness (added-flare keys are generated in the route,
+not the builder).
 
-Add, `.strict()` where the shape is an object:
-- `flareListQuerySchema`: `{ limit?: coerced int 1..50, before?: string }`.
-  Coerce `limit` from the query string; reject out-of-range. `before` is a
-  string the route parses into `{createdAt, id}`; a malformed cursor -> `400`.
-- `exportQuerySchema`: `{ format: z.enum(["json","csv"]) }`. Missing/unknown
-  -> `400`.
+### 3.5 Templated prose (pure functions, exact rules)
 
-Query params arrive as strings; coerce and validate at the boundary, and
-reject unknown/extra params rather than ignoring them.
+All in `src/lib/reconstruction.ts`, all pure, all unit-tested. These strings
+are user-visible copy: they obey the copy bar (no em-dashes, positive,
+short) and the file joins the copy-sweep ROOTS.
 
-### 3.8 Display helper (`src/lib/display.ts`)
+**`headlineText(snapshot, today)`** returns one to three short sentences,
+joined with spaces:
 
-Add `keyTreatmentsText(treatments: TreatmentDTO[]): string | null`:
-- Returns null for an empty list (the row simply omits the line).
-- Prioritizes treatments marked `helped === "yes"`, then the rest in the
-  order `serializeFlare` already produced (start-ascending, unrecorded last).
-- Shows up to 3 names joined by ", "; if more remain, appends " +N more".
-- Names only (no start/helped detail) to keep the row scannable. Example:
-  `"Naproxen, Rest"` or `"Naproxen, Rest, Prednisone +2 more"`.
+1. **Count.** N = snapshot flares. With `rangeStart`:
+   "3 flares since March." / "1 flare since March." The month renders via
+   the month name of `rangeStart`, plus the year when it differs from
+   `today`'s year ("since March 2025"). First visit (`rangeStart` null):
+   "3 flares recorded." / "1 flare recorded." Zero flares: "A quiet stretch
+   since March." / first visit: "A quiet stretch so far." (no further
+   sentences in the zero case).
+2. **Longest.** Over closed flares with a computable duration; omitted when
+   there are none. Two or more closed: "Longest about 12 days." One closed:
+   "It lasted about 12 days." The word "about" appears iff that flare's
+   onset or end precision is `approx` (same rule as `durationTextFor`);
+   exact-exact reads "Longest 12 days." Singular day: "1 day".
+3. **Treatment timing contrast (the signature sentence).** Candidates are
+   ordered pairs (A, B) of closed snapshot flares with durations >= 1 day
+   sharing a treatment name (compared trimmed, case-insensitive), where in
+   A the treatment's `startedOn` equals A's `onsetDate` (day one) and in B
+   it has a recorded `startedOn` at least 2 days after B's onset, and
+   A's duration < B's duration. Pick the candidate with the smallest ratio
+   `durA / durB`; break ties by treatment name ascending, then A's onset
+   ascending. Emit nothing when there is no candidate or the best ratio is
+   above 0.85. Otherwise, with the treatment's stored casing from A:
+   - ratio <= 0.30: "Naproxen started on day one, that flare was about a
+     third as long."
+   - ratio <= 0.60: "Naproxen started on day one, that flare was about
+     half as long."
+   - ratio <= 0.85: "Naproxen started on day one, that flare was
+     noticeably shorter."
+   The hedge word "about" in the fraction phrasing is deliberate: a ratio
+   over hedged durations never claims exactness.
 
-Reuse the existing helpers for everything else; do not duplicate hedging or
-severity logic.
+**`coverageText(snapshot)`**: "Built from 3 recorded flares, not a daily
+diary." / "Built from 1 recorded flare, not a daily diary." When
+`truncated`: append "Showing the newest 50." It never implies completeness
+and appears on both the correction pass and the printed page.
 
-### 3.9 Screens and states (mobile-first, 390px baseline)
+**`flareRangeText(flare, today)`** (the per-flare line):
+- Closed, exact-exact: "Sep 3 to Sep 9, 7 days."
+- Any approx bound: "Around Sep 3 to around Sep 9, about 7 days." (the
+  "around" attaches only to the approx bound; an exact onset with approx
+  end reads "Sep 3 to around Sep 9, about 7 days.")
+- Open: "Started around Sep 12, still going." (or "Started Sep 12, still
+  going." when exact). Dates use `formatMonthDay`, adding the year via
+  `formatExact` when the date's year differs from `today`'s.
 
-**Ledger (`/ledger`).** Keep the existing empty state and newest-first list.
-Each closed or open row, tappable to `/flares/:id/edit`, shows in a scannable
-stack:
-- Onset line (`onsetText`), bold.
-- End line (`endText`) when closed, or the open pill.
-- Duration (`durationTextFor`) when closed ("Lasted about 6 days").
-- Severity (`severityText`) as a muted line ("Peak severity 4 of 5" /
-  "Severity not recorded").
-- Key treatments (`keyTreatmentsText`) as a muted line when present.
-- The status pill stays.
-No horizontal scroll at 390px; touch target for the whole row >= 44px.
-Below the list, a subordinate **export section**: a small `card` titled
-"Export your record" holding `ExportActions` (Download JSON, Download CSV,
-Print). It never competes with the list for attention.
+**`treatmentLineText(t, flare)`**: "Naproxen from day one. Helped." /
+"Naproxen from about day 3. Not sure." / "Rest, start not recorded.
+Helped." Day k = `daysBetween(onset, startedOn) + 1`; "day one" when k is
+1; "about" iff the start or the onset precision is approx. The helped word
+reuses `helpedText`.
 
-**Load older.** `LedgerPager` renders a single "Load older flares" button
-after the list when more pages exist; pressing appends the next page and
-updates the cursor; it disappears when the record is exhausted.
+Severity reuses `severityText` ("Peak severity 4 of 5" / "Severity not
+recorded").
 
-**Export actions (`ExportActions.tsx`, client).** Download uses `fetch` to
-the export endpoint, and on a 2xx builds a blob URL and triggers the download
-(so a failure is catchable), then revokes the URL. On a non-2xx it shows an
-inline product-voice error with a retry ("Check your connection and try
-again."; a `429` reads "You're going quickly. Try again in a minute."). Each
-button gives a pressed/in-flight state within 100ms. "Print" navigates to
-`/ledger/print` (or opens it and calls `window.print()`).
+### 3.6 API contracts
 
-**Flare detail (`/flares/:id/edit`).** Already delivered in EPIC 2 and
-already renders the full interview data editably (end, duration, severity,
-treatments with start + helped, impact/symptom notes). This EPIC confirms
-each ledger row links to it and that the complete record is visible and
-correctable there. Do not rebuild it; if a field from the interview is not
-shown, add only that.
+All handlers: session via `requireUser` (401 without one); mutations also
+pass `guardMutation(user.id)` (429 in product voice); bodies and params
+validated with Zod at the boundary; another user's appointment answers 404
+("That page isn't here.") so existence never leaks; no note text, treatment
+names, or email in logs.
 
-**Global states (every new/changed surface).**
-- **Loading**: the ledger's route-level skeleton (`loading.tsx`) holds the
-  layout on first load; `LedgerPager` and `ExportActions` show in-place
-  in-flight states, never a white screen or a dead-end spinner.
-- **Empty**: the existing ledger empty state stays (positive, says what to do
-  first). The print view's empty state is positive and offers a way back.
-- **Error**: product-voice message with a retry on every failed fetch (pager,
-  export). Never a raw stack trace or status code.
+**`POST /api/appointments`** creates and drafts in one step.
+- Body (`appointmentCreateSchema`, strict):
+  `{ visit_date: string, specialty?: string }`. `visit_date` must parse via
+  `parseIsoDate` and lie between `today - 365` and `today + 365` days;
+  `specialty` trimmed, 1..80 chars. Invalid: 400 "That date doesn't look
+  right. Pick your visit date."
+- Server: resolve `rangeStart` (§3.4), load the in-range flares, build the
+  draft snapshot, validate it against `snapshotSchema`, insert the row.
+- Returns 201 `{ appointment: AppointmentDTO }`.
 
-### 3.10 Copy rules
+**`GET /api/appointments`** lists the caller's visits, `visit_date desc,
+created_at desc`, capped at the newest 50 (a handful per year in practice;
+the cap keeps the read bounded). Returns 200
+`{ appointments: AppointmentListItemDTO[] }` where the list item is
+`{ id, visitDate, specialty, flareCount, createdAt }` (`flareCount` from the
+snapshot; the full snapshot is not shipped in the list).
 
-Every new visible string obeys QUALITY BAR §7 and §8: one obvious action,
-words cut to the minimum, positive phrasing, no em-dashes or dash-asides,
-none of the banned LLM vocabulary. Sweep before done. Suggested strings
-(final wording is the implementer's, held to the same bar):
-- Export section: "Export your record", "Download JSON", "Download CSV",
-  "Print".
-- Pager: "Load older flares".
-- Print view: "Your flare record", "Back to ledger", "Print",
-  "Start a flare to build your record." (empty).
-- Errors: "Check your connection and try again." and, on a limit,
-  "You're going quickly. Try again in a minute." (reuse the existing
-  strings; do not invent new error voices).
-- Ledger rows reuse the existing hedged helpers ("Started around Sep 10",
-  "Ended around Sep 21", "Lasted about 6 days", "Peak severity 4 of 5").
+**`GET /api/appointments/:id`** returns 200
+`{ appointment: AppointmentDTO }`:
+`{ id, visitDate, specialty, snapshot, createdAt }`. Prose is derived
+client/RSC-side from the snapshot with the shared pure functions, so it can
+never go stale against the data.
 
-### 3.11 Security, secrets, logging
+**`PATCH /api/appointments/:id`** applies exactly one correction operation
+per request (one tap, one save, optimistic UI). Body is
+`appointmentCorrectionSchema`, a strict discriminated union on `op`:
 
-- Authorization on every new route server-side: the extended list, the export
-  endpoint, and the print page all resolve the session and scope every query
-  by `userId`. A hidden button is never the access check.
-- Every export and list query is `where: { userId: user.id }`; there is no
-  code path that reads another user's flares or treatments.
-- Zod validation at every boundary: list `limit`/`before`, export `format`.
-  Reject unknown/extra query params with `400`.
-- CSV formula-injection guard on every user-controlled field (§3.5). This is
-  the output-encoding half of security hygiene for a downloadable file.
-- Export rate-limited per user; the list endpoint is a bounded read.
-- No new secrets, no new required env (the export limit has a safe default).
-  No PII in logs: never log note text, treatment names, or email.
+- `{ op: "set_visit", visit_date?, specialty? (nullable) }`, at least one
+  field. Same bounds as create. Changing the visit date does NOT redraft
+  the snapshot; corrections already made are never thrown away.
+- `{ op: "set_flare", key, onset_date?, onset_precision?, end_date?
+  (nullable), end_precision?, peak_severity? (nullable), note? (nullable),
+  treatments? }`, at least one field beyond `key`. Rules, enforced against
+  the merged result: dates parse via `parseIsoDate` and are not after
+  today; `end_date` null clears the end (the flare reads "still going");
+  a set end needs `end_precision` and must be on/after onset with duration
+  <= 730 days; a set `onset_date` needs `onset_precision`;
+  `peak_severity` int 1..5 or null; `note` <= 300 chars or null;
+  `treatments`, when present, replaces the flare's whole list (<= 20
+  entries of `SnapshotTreatment` shape; each recorded `startedOn` parses,
+  is not before onset and not after today). Unknown `key`: 400.
+- `{ op: "add_flare", onset_date, onset_precision, end_date? (nullable),
+  end_precision?, peak_severity?, note?, treatments? }`: same field rules.
+  The server generates the `key` (`crypto.randomUUID()`), sets
+  `source: "added"`, inserts, and re-sorts flares onset-ascending. When the
+  snapshot already holds 50 flares: 400 "This timeline is at its limit of
+  50 flares."
+- `{ op: "remove_flare", key }`: allowed only for `source: "added"` entries
+  (undo for a mistaken add); removing a drafted flare is not a correction,
+  it is ledger editing, which lives in EPIC 2's editor. Drafted key: 400.
+
+The apply logic is a pure function
+`applyCorrection(snapshot, op, today): { ok: true, snapshot } | { ok: false, error }`
+in `reconstruction.ts`, unit-tested directly; the route wraps it with auth,
+ownership, rate limit, Zod, and persistence (validate the resulting
+snapshot with `snapshotSchema`, write `snapshot` and `updated_at`). Returns
+200 `{ appointment: AppointmentDTO }`. Malformed ops: 400 "That request
+could not be read." Field-level failures use "That date doesn't look right.
+Pick when it started." / "...when it ended." in the existing voice.
+
+### 3.7 Screens and states (mobile-first, 390px baseline)
+
+**Home (`/home`).** Add one quiet link, "Doctor visit coming up?", next to
+"See your ledger", pointing at `/appointments`. Nothing else changes; the
+one primary action on home stays "Start a flare".
+
+**Visits (`/appointments`, RSC).** h1 "Before your visit". Primary action:
+"Doctor visit coming up" opens `AppointmentCreator` (sheet pattern): a date
+input defaulting to today, an optional specialty input with placeholder
+"Rheumatology" (show, don't tell), submit "Draft my timeline". On success,
+redirect to `/appointments/:id`. Below, past visits as tappable rows
+("Oct 2, 2026", specialty when set, "3 flares"), newest first. Empty state
+(designed): "One page for your doctor, drafted from your flares." with the
+same primary button. Submitting gives a pressed/in-flight state within
+100ms; failure shows the existing product-voice error with retry.
+
+**Correction pass (`/appointments/[id]`, RSC shell + `SnapshotEditor`).**
+- Header card: the headline (`headlineText`) as the lead, the coverage line
+  (`coverageText`) muted beneath it. The visit date and specialty sit above
+  in small text, editable (tap opens a small sheet -> `set_visit`).
+- The timeline: one row per snapshot flare, onset-ascending, each showing
+  `flareRangeText`, severity, treatment lines, and the note when present.
+  Tapping a row opens an edit sheet with pre-filled inputs: onset date +
+  an "Around then" toggle (precision), end date + toggle + a "Still going"
+  clear, the 1..5 severity scale (reuse the pressed-state pattern from the
+  interview), treatments (name, day, helped), and the note. Save issues one
+  `PATCH set_flare`, updates optimistically, and re-renders the headline
+  from the new snapshot at once (the prose is derived, so a corrected date
+  visibly updates "Longest about..." without a reload). Rows added during
+  correction carry a small "added" pill and offer "Remove" inside their
+  sheet (`remove_flare`).
+- "Add a missed flare" (`btn-secondary`) under the list opens the same
+  sheet empty except onset defaulting to nothing selected -> `add_flare`.
+- Footer primary action: "Print one page" links to
+  `/appointments/[id]/print`.
+- States: RSC loads the appointment server-side (signed-out redirects to
+  `/signin`; another user's id renders Next's `notFound()`); every PATCH
+  gives sub-100ms feedback and a product-voice inline error with retry on
+  failure ("Check your connection and try again." / the 429 message). No
+  layout jump while a sheet saves.
+
+**The one-pager (`/appointments/[id]/print`, RSC).**
+- On screen: a `no-print` row ("Back to corrections" link, "Print" button
+  reusing `PrintButton`), then the page content inside a `.onepage`
+  container: title "Flare timeline", subline with specialty and visit date
+  ("Rheumatology visit, Oct 2, 2026." or "Visit on Oct 2, 2026."), prepared
+  date ("Prepared Sep 15, 2026."), the headline in large type, then one
+  compact block per flare (range line, severity, treatment lines, note),
+  and the coverage line as the footer.
+- Print CSS in `globals.css`: the existing `@media print` block already
+  hides `.topbar` and `.no-print` and strips the container; add `.onepage`
+  rules for print: body type ~12.5px, title ~20px, tight margins,
+  `@page { margin: 12mm }`, `break-inside: avoid` per flare block, no
+  shadows or cards, black on white. The page must fit a single A4 AND a
+  single Letter page for a typical record (operationalized in §5: with the
+  demo record, printed content height stays under 950 CSS px, which fits
+  both paper sizes at 12mm margins). With many flares the type stays
+  compact and blocks never split across pages.
+- Empty snapshot: the headline's quiet-stretch line plus "Add a missed
+  flare from the corrections page." and a way back. Never a blank page.
+- Signed-out redirects to `/signin`; the page renders only the caller's
+  appointment.
+
+### 3.8 Copy (suggested strings, already swept)
+
+Final wording is the implementer's, held to QUALITY BAR §7 and §8 (no
+em-dashes, positive, short; sweep mechanically before done). Suggested:
+- Home link: "Doctor visit coming up?"
+- Visits screen: "Before your visit", "Doctor visit coming up",
+  "Draft my timeline", empty state "One page for your doctor, drafted from
+  your flares."
+- Correction pass: "Your draft timeline", lede "Fix anything wrong. Then
+  print one page.", "Add a missed flare", "Still going", "Around then",
+  "Remove", "Print one page".
+- One-pager: "Flare timeline", "Prepared Sep 15, 2026.", "Back to
+  corrections", "Print".
+- Prose examples are normative in §3.5.
+- Errors reuse the existing voice: "Check your connection and try again.",
+  "You're going quickly. Try again in a minute.", "That page isn't here.",
+  "That date doesn't look right. Pick your visit date."
+
+### 3.9 Seed and staging
+
+The existing `SEED_DEMO` data already carries the signature pair (Naproxen
+on day six in a 12-day flare, Naproxen on day one in a 6-day flare, plus an
+open flare). Do not add a seeded appointment: the demo's first "Doctor
+visit coming up" tap must draft all-time and produce the §2 headline live,
+which is the differentiator shown within a minute on staging. Touch
+`src/lib/seed.ts` only if a test proves the pair no longer fires the
+contrast sentence, and then only minimally.
+
+### 3.10 Guards (non-goal and copy)
+
+- `tests/nonGoalGuard.test.ts`: add `"src/lib"` to `ROOTS`, and add
+  MECHANICAL markers proving no LLM sits in any path:
+  `/LLM_GATEWAY_URL|LLM_API_KEY|\bopenai\b|\banthropic\b|chat\/completions|\/v1\/messages/i`
+  (label "LLM call in a no-LLM product"). The existing scheduling, chart,
+  filter, and share markers must keep passing over the new files (in
+  particular: no share/public/clinician route appears).
+- `tests/copy.test.ts`: add `"src/lib/reconstruction.ts"` to `ROOTS` so the
+  templated prose is swept like any shipped string.
+- Determinism as a test: the same fixture rows produce byte-identical
+  snapshots and headlines across runs (no clock, no randomness in the pure
+  functions).
+
+### 3.11 Security, performance, logging
+
+- Every route resolves the session server-side and scopes every query by
+  `userId`; appointment reads check ownership and answer 404 on a foreign
+  id. There is no unauthenticated or cross-user path to a snapshot.
+- Zod at every boundary, `.strict()` objects, one validated op per PATCH;
+  the server re-validates the whole snapshot before persisting any change,
+  so a crafted PATCH can never store an out-of-shape document.
+- `POST` and `PATCH` go through `guardMutation` (per-user 429). Reads are
+  bounded (list capped at 50, one row by id) and follow the house
+  convention of the flares list: authorized, validated, not separately
+  rate-limited.
+- Drafting is two indexed queries (previous appointment via
+  `appointments_user_visit_idx`, in-range flares via the existing flare
+  indexes with a batched treatment include). Nothing here scales with
+  another user's data, and the 50-flare cap bounds every render.
+- No PII in logs: never log snapshot content, notes, treatment names,
+  specialty, or email.
+- No new env, no new secrets.
 
 ---
 
 ## 4. Ordered task list (each with acceptance criteria)
 
-**T1. List pagination + treatments.** Extend `GET /api/flares` with keyset
-pagination and batched treatments per §3.3–3.4; add `flareListQuerySchema`.
-- AC: `GET /api/flares` returns the caller's flares newest-first with their
-  treatments and a `nextCursor`; passing `before=<nextCursor>` returns the
-  next page with no overlap and no gap; the final page returns
-  `nextCursor: null`.
-- AC: `limit` outside 1..50 and a malformed `before` each return `400`; no
-  session returns `401`; the response never contains another user's flare.
+**T1. Migration + model + schemas.** `0003_appointments` per §3.3, the
+Prisma `Appointment` model, `appointmentCreateSchema`,
+`appointmentCorrectionSchema`, and `snapshotSchema` per §3.2 and §3.6.
+- AC: `prisma migrate deploy` applies cleanly on an existing EPIC 1-3
+  database; the composite index exists; both request schemas reject
+  unknown fields, out-of-range dates, and a specialty over 80 chars
+  (proved in `tests/validation.test.ts`).
 
-**T2. Ledger presentation + pager.** Enrich the ledger rows (severity + key
-treatments), render the first page server-side, and add `LedgerPager` and
-`keyTreatmentsText` per §3.3, §3.8, §3.9.
-- AC: each row shows onset to end, duration, peak severity, and key
-  treatments without opening the flare; a closed flare with an approx bound
-  reads "about N days", an exact-exact flare reads "N days".
-- AC: with more than one page of flares, "Load older flares" appends the next
-  page and disappears when the record is exhausted; first meaningful render
-  shows real rows within about one second (SSR first page, two indexed
-  queries).
-- AC: at 390px the ledger has no horizontal scroll and each row is tappable
-  to its detail.
+**T2. Draft builder.** `buildDraftSnapshot` and the range/cap/note rules of
+§3.4 as pure functions with unit tests.
+- AC: given fixture flares, the builder includes exactly the open and
+  end-on-or-after-rangeStart flares, all-time when `rangeStart` is null,
+  orders onset-ascending, caps at 50 with `truncated: true`, drafts notes
+  joined and word-truncated at 300, and is byte-deterministic across runs.
 
-**T3. Export endpoint (JSON + CSV).** `GET /api/export?format=json|csv` per
-§3.5, with `src/lib/export.ts`, `src/lib/csv.ts`, `exportQuerySchema`, and
-`exportLimit()`.
-- AC: `format=json` returns a document that `JSON.parse`s and contains every
-  one of the caller's flares with treatments and nothing from any other user;
-  `format=csv` returns a header plus one row per treatment (and one row for a
-  treatment-less flare) that opens correctly in a spreadsheet.
-- AC: a field beginning with `=`, `+`, `-`, or `@` is neutralized in the CSV;
-  fields with commas/quotes/newlines are RFC-4180 quoted.
-- AC: missing/unknown `format` -> `400`; no session -> `401`; over the export
-  limit -> `429`. Correct `Content-Type` and attachment `Content-Disposition`
-  on both formats.
+**T3. Templated prose.** `headlineText`, `coverageText`, `flareRangeText`,
+`treatmentLineText` per the exact rules of §3.5, unit-tested.
+- AC: a fixture shaped like the demo seed yields exactly "3 flares
+  recorded. Longest about 12 days. Naproxen started on day one, that flare
+  was about half as long."; the ratio bands switch at 0.30/0.60/0.85; no
+  contrast sentence without a qualifying pair; hedging appears iff a bound
+  is approx; zero-flare and since-month variants render as specified; the
+  coverage line never implies completeness and reports truncation.
 
-**T4. Printable view.** `/ledger/print` per §3.6 with print CSS in
-`globals.css`.
-- AC: the print view renders the whole record with hedged duration/end,
-  severity, treatments, and notes; app chrome and on-screen controls are
-  hidden in print; a flare is not split across pages.
-- AC: it is authorized (a signed-out request redirects to sign-in) and shows
-  only the caller's data; an empty record shows a positive line and a way
-  back, never a blank page.
-- AC: it introduces no headline synthesis, no since-last-visit scoping, and
-  no appointment entity (EPIC 4 boundary held).
+**T4. Create + list endpoints.** `POST /api/appointments` (resolve previous
+visit, draft, persist) and `GET /api/appointments` per §3.6.
+- AC (e2e API): POST with a valid date returns 201 with a drafted snapshot
+  built from that user's flares only; a second appointment's draft covers
+  exactly the flares open or ended on/after the first appointment's visit
+  date; bad/missing/out-of-range `visit_date` -> 400; no session -> 401;
+  flooding mutations -> 429; the list returns the caller's visits newest
+  first with `flareCount` and no snapshot bodies.
 
-**T5. Export surface + states.** The ledger export section and
-`ExportActions` per §3.9, with designed loading and error states.
-- AC: from the ledger a user downloads JSON and CSV and reaches the print
-  view; each action gives feedback within 100ms; a failed export shows a
-  product-voice error with a retry, never a stack trace or raw status.
-- AC: the export section is visibly subordinate to the list; at 390px there is
-  no horizontal scroll.
+**T5. Read + correction endpoints.** `GET` and `PATCH
+/api/appointments/:id` with `applyCorrection` per §3.6.
+- AC (unit): `applyCorrection` handles set_visit, set_flare (dates,
+  precisions, still-going clear, severity, note, treatment replacement),
+  add_flare (sorted insert, added source, 50-cap refusal), remove_flare
+  (added-only) and rejects unknown keys, future dates, end-before-onset,
+  and drafted-row removal.
+- AC (e2e API): a PATCH persists into the stored snapshot and survives a
+  re-GET; corrections are not lost when the visit date changes; a foreign
+  appointment id answers 404 for GET and PATCH; malformed ops -> 400; no
+  session -> 401; flooding -> 429.
 
-**T6. Detail confirmation.** Confirm each ledger row links to
-`/flares/:id/edit` and that surface shows the complete interview record,
-editable (reusing EPIC 2's editor). Add only a missing field, if any.
-- AC: tapping a flare opens its detail with end, duration, severity, every
-  treatment (start + helped), and impact/symptom notes, all editable; a
-  correction persists and survives reload.
+**T6. Visits screen + home entry.** `/appointments`, `AppointmentCreator`,
+and the home quiet link per §3.7.
+- AC (e2e UI at 390px): from home, "Doctor visit coming up?" reaches the
+  visits screen; creating a visit with the default date lands on the
+  correction pass; the empty state is designed and positive; the create
+  button shows an in-flight state; no horizontal scroll.
 
-**T7. Non-Goal guard.** Ensure `tests/nonGoalGuard.test.ts` still passes and
-extend it to assert this EPIC added no filtering dashboard, chart/graph
-library, or cross-user read.
-- AC: the guard fails if the tree gains a chart/graph/plot library import, a
-  ledger filter/search/facet control, or a share/public/cross-user read path,
-  and passes on the delivered tree.
+**T7. Correction pass.** `/appointments/[id]` + `SnapshotEditor` per §3.7.
+- AC (e2e UI at 390px): the demo user sees the §2 headline and the coverage
+  line; tapping a drafted flare, changing its end date, and saving updates
+  the row and the headline without a reload and survives a full reload;
+  "Add a missed flare" creates a row marked as added that persists; an
+  added row can be removed; every save gives feedback within 100ms and a
+  failed save shows a product-voice error with retry; touch targets >=
+  44px; no horizontal scroll.
 
-**Copy sweep (part of DONE, not a separate task).** Mechanically search every
-user-visible string added or edited (the export section, pager, print view,
-error messages, any new row copy) for `—`, `–`, the banned LLM vocabulary,
-and negative empty-state phrasing ("You don't have", "No ... yet", "Nothing
-here", "Unable to", "Something went wrong"). Fix every hit. Confirm
-`tests/copy.test.ts` scans the new files (its ROOTS already include
-`src/app` and `src/components`).
+**T8. The one-pager.** `/appointments/[id]/print` + print CSS per §3.7.
+- AC (e2e): the page shows the headline, per-flare blocks with hedged
+  wording ("about 12 days"), and the coverage footer; with print emulation
+  the topbar and `no-print` controls are hidden and each flare block has
+  `break-inside: avoid`; for the demo record the printed content height
+  stays under 950 CSS px at both 794px (A4) and 816px (Letter) widths, so
+  it fits one page on both; signed-out redirects to `/signin`; an empty
+  snapshot renders the quiet-stretch line and a way back, never a blank
+  page.
 
-**README (part of DONE).** Update `README.md` so a stranger learns the ledger
-lists the whole record, the export produces JSON/CSV, and the record prints
-to one clean document. Keep the run/test commands accurate and free of
-factory internals.
+**T9. Guards + README.** Extend `nonGoalGuard` and `copy` ROOTS/markers per
+§3.10; add a short README section (the app drafts a one-page timeline
+before a doctor visit; you correct it and print it), verified against how
+the app actually runs.
+- AC: the non-goal guard fails on any LLM marker, scheduler, chart, filter,
+  or share path in `src/app`, `src/components`, or `src/lib`, and passes on
+  the delivered tree; the copy sweep covers `reconstruction.ts` and passes;
+  the README stays accurate and free of factory internals.
+
+**Copy sweep (part of DONE, not a separate task).** Mechanically search
+every added or edited user-visible string (screens, components,
+`reconstruction.ts` prose, README example copy) for em/en dashes, the
+banned vocabulary, and negative empty-state phrasing; fix every hit.
 
 ---
 
-## 5. Test plan (which automated test proves each criterion)
+## 5. Test plan (which automated test proves each planner criterion)
 
-| Acceptance criterion | Test type | What it asserts |
+| Planner criterion | Test | What it asserts |
 |---|---|---|
-| List returns flares + treatments + cursor | API (Playwright) | `GET /api/flares` returns rows with `treatments` and a `nextCursor` |
-| Keyset pagination has no gap/overlap | API (Playwright) | Seed > 1 page; walk `before=nextCursor` to exhaustion; union equals all flares, no id repeats |
-| List rejects bad params / unauth / cross-user | API (Playwright) | `limit` out of range and malformed `before` -> `400`; no session -> `401`; response excludes another user's flare |
-| Rows show duration/severity/treatments; hedging | Playwright (390px) | Row renders onset-to-end, duration ("about N days" vs "N days"), severity, key treatments; `scrollWidth <= innerWidth` |
-| Load older appends and ends | Playwright | With > 1 page, "Load older flares" appends the next page and disappears at the end |
-| Row links to editable detail | Playwright | Tapping a row opens `/flares/:id/edit` showing full interview data; an edit persists on reload |
-| First render is fast / SSR first page | Playwright | Ledger HTML contains real rows on first response (server-rendered), not only after client fetch |
-| JSON export parses and is complete + scoped | API (Playwright) | `format=json` body `JSON.parse`s, includes all of user A's flares/treatments, none of user B's |
-| CSV export shape | Unit (Vitest) + API | Header + one row per treatment; treatment-less flare -> one row with empty treatment cols |
-| CSV quoting + injection guard | Unit (Vitest) | Comma/quote/newline fields RFC-4180 quoted; a leading `= + - @` field is prefixed with `'` |
-| Export headers | API (Playwright) | Correct `Content-Type` and attachment `Content-Disposition` for json and csv |
-| Export bad format / unauth / rate limit | API (Playwright) | Missing/unknown `format` -> `400`; no session -> `401`; over the limit -> `429` |
-| JSON payload builder scoping | Unit (Vitest) | `src/lib/export.ts` builder over two users' data returns only the target user's flares |
-| Print view renders record, authorized, scoped | Playwright | `/ledger/print` shows the user's flares with hedged text; signed-out redirects; empty record shows a positive line |
-| Print hides chrome / no page-split | Playwright | With print emulation, app nav and `no-print` controls are hidden; per-flare block has `break-inside: avoid` |
-| Export surface feedback + error | Playwright | Download JSON/CSV works; a forced failure shows a product-voice error with retry, no stack trace |
-| Non-Goal guard | Inspection (Vitest) | Source scan finds no chart/graph library, no filter/search dashboard control, no cross-user/share read |
-| Copy sweep clean | Lint/script (Vitest) | New user-visible strings carry no `—`/`–`, banned vocabulary, or negative empty-state phrasing |
+| Create draws since previous appointment (all-time first), deterministically | Unit `tests/reconstruction.test.ts` + e2e API `appointments.spec.ts` | Builder range/cap/determinism on fixtures; POST #1 drafts all-time, POST #2 drafts only flares open or ended on/after visit #1's date; snapshot built from stored rows only |
+| Headline is real and data-built; coverage stated plainly | Unit (exact strings, bands, variants) + e2e UI `reconstruction.spec.ts` | Demo fixture yields the §2 headline verbatim; coverage line "Built from N recorded flares, not a daily diary." visible on the correction pass and the print page |
+| Correct any drafted value; add a missed flare; saves to the snapshot | Unit (`applyCorrection`) + e2e API + e2e UI | Every op validated and applied; PATCH persists across re-GET; UI edit survives reload; added flare appears, persists, and is removable |
+| Print renders one clean page on A4 and Letter, no chrome | e2e with `emulateMedia({ media: "print" })` | Chrome and `no-print` hidden; `break-inside: avoid` per block; demo content height < 950px at 794px and 816px viewport widths |
+| Uncertainty surfaces as hedged wording | Unit + e2e UI | "about N days" iff a bound is approx; "Around Sep 3" for approx dates; exact-exact renders unhedged; contrast sentence always fraction-hedged |
+| Whole flow legible at 390px; routes authorized, validated, rate-limited | e2e UI at 390x844 + e2e API | No horizontal scroll on visits, correction, print; 401 without session on every API route; foreign id -> 404; bad input -> 400; flooded mutations -> 429 |
+| No LLM in this path (Non-Goal guard) | `tests/nonGoalGuard.test.ts` | LLM markers (gateway env names, provider names, completion endpoints) fail the suite anywhere in `src/app`, `src/components`, `src/lib` |
 
-Every criterion above must have a green automated test before the EPIC is
-`success`. Run the full Vitest and Playwright suites in the foreground to
-completion.
+Plus: `tests/validation.test.ts` covers both new schemas;
+`tests/copy.test.ts` sweeps the new prose; the existing Vitest and
+Playwright suites must stay green (in particular `nonGoalGuard`, `copy`,
+`ledger`, `export`). Run both suites in the foreground to completion before
+declaring success.
 
 ---
 
 ## 6. Assumptions (resolved, non-blocking)
 
-- **Pagination over a hard cap.** The AC allows "paginated or capped", but a
-  multi-year clinical record must not silently hide older flares (the
-  north-star promise is completeness), and export must be complete anyway.
-  So the ledger uses keyset pagination to reach every flare while each query
-  stays bounded and index-backed. This strengthens, and does not contradict,
-  the plan.
-- **Ordering.** The ledger stays newest-first by `created_at` (the existing
-  index); the export and print views read oldest-first by onset (a record
-  reads best as a timeline). Onset-based ledger sorting is out of scope.
-- **List contract change.** EPIC 2 kept `GET /api/flares` lean without
-  treatments; this EPIC adds treatments (a single batched, indexed relation
-  load) because the row needs key treatments and the cost is negligible. This
-  is a deliberate, documented change, not drift.
-- **Export lives on the ledger, not a settings screen.** The plan houses
-  export in settings; no settings screen exists yet and building one is out
-  of scope, so the export actions sit subordinate on the ledger. A settings
-  screen can move them later without changing the endpoint.
-- **Printable output is a plain full-record printout.** The since-last-visit
-  reconstruction, its data-built headline, and the correction pass are EPIC
-  4's signature moment and are explicitly not built here.
-- **No new stored fields and no LLM.** The DTOs and display helpers from EPIC
-  2 already carry everything shown; export and print are deterministic
-  serialization. No migration, no gateway grant, no new env beyond an
-  optional export-limit default.
-```
+- **Corrections and added flares live in the snapshot only.** The planner
+  states "corrections save to the appointment snapshot", and the add
+  happens "from inside the correction pass", so the whole pass edits the
+  appointment's account, never the ledger. This also keeps the snapshot an
+  honest record of what was handed to the doctor that day. Changing the
+  underlying record remains EPIC 2's editor; two-way sync is deliberately
+  not built.
+- **Prose is derived, not stored.** The plan sketch mentions storing
+  rendered text and a coverage note; storing them would go stale after
+  every correction. The snapshot stores structure only and the pure
+  functions render prose at read time, which is strictly more deterministic
+  and keeps corrections instantly reflected in the headline.
+- **`specialty` is included** (optional, <= 80 chars) because the plan's
+  data model sketch names it and the one-pager header uses it; it is one
+  optional input, never required.
+- **Visit date bounds** are today +/- 365 days: enough to log a visit just
+  past or a year ahead, tight enough to catch typos.
+- **Snapshot cap of 50 flares** bounds the document and the page; the
+  coverage line reports truncation honestly. Fifty flares since one visit
+  is far past any realistic interval.
+- **Reads are not separately rate-limited**, matching the delivered
+  convention on `GET /api/flares` (authorized, validated, bounded);
+  mutations use the existing per-user limiter. The planner's "rate-limited"
+  criterion is read as the app-wide convention: every mutation limited,
+  every route authorized and validated.
+- **No appointment delete surface.** No criterion requires it and the
+  correction ops fix every recoverable mistake (`set_visit`,
+  `remove_flare` for adds). A delete can ride a later EPIC if the owner
+  wants one.
+- **"One page" is operationalized** as: demo-record content fits a single
+  A4 and a single Letter page at 12mm margins (the concrete height/width
+  assertions in T8), and per-flare blocks never split. A pathological
+  50-flare snapshot prints compactly but may run long; the criterion's
+  "clean one page" is guaranteed for the realistic records the product is
+  built around.

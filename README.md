@@ -11,8 +11,22 @@ short end-of-flare interview, and correct any flare after the fact. The ledger
 lists your whole history, newest first, and each row shows the flare's
 duration, peak severity, and key treatments at a glance. You can carry the
 record out the door three ways: download it as JSON, download it as a
-spreadsheet-ready CSV, or print a clean one-document view. The one-page
-pre-appointment timeline and the guided first run arrive in later milestones.
+spreadsheet-ready CSV, or print a clean one-document view. Before a doctor
+visit, the app drafts a one-page timeline of the flares since your last
+appointment for you to correct and print. The guided first run arrives in a
+later milestone.
+
+## Before your visit: the one-pager
+
+Tap "Doctor visit coming up?" on the home screen (or open `/appointments`)
+and pick the visit date. The server drafts a timeline of every flare since
+your previous appointment (your whole record on the first visit), built only
+from what you already logged. All wording is templated from your stored
+dates and treatments, with uncertainty kept honest ("about 12 days"). You
+then correct the draft in place: tap a flare to fix its dates, severity,
+treatments, or note, and add a flare you never logged. Corrections live on
+that visit's snapshot; your ledger stays the raw record. When it reads
+right, print it: the print view fits one clean A4 or Letter page.
 
 ## The ledger and export
 
