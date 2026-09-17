@@ -42,6 +42,7 @@ model Flare {
   peakSeverity   Int?        @map("peak_severity") @db.SmallInt
   impactNote     String?     @map("impact_note")
   symptomNote    String?     @map("symptom_note")
+  nudgedAt       DateTime?   @map("nudged_at") @db.Timestamptz(6)
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
