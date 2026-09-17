@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 // The product's whole thesis is that it never nags on a schedule and never
@@ -15,6 +15,11 @@ const MECHANICAL: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /settimeout\s*\([^,]+,\s*\d{4,}/i, label: "long setTimeout (a delayed nudge)" },
   { pattern: /\bcron\b/i, label: "cron scheduler" },
   { pattern: /new\s+Notification|Notification\.requestPermission|showNotification/i, label: "scheduled notification" },
+  // EPIC 5 boundary: the PWA install and covenant nudge add no push and no
+  // email path. A push subscription or mailer call anywhere in the app source
+  // betrays the "never nags on a schedule" thesis and fails the suite.
+  { pattern: /PushManager|pushManager|web-?push/i, label: "push subscription" },
+  { pattern: /nodemailer|central-mailer|X-Internal-Key/i, label: "email path" },
   { pattern: /recharts|chart\.js|chartjs|\bd3\b|victory|nivo/i, label: "charting library" },
   // EPIC 3 boundaries: the ledger is one newest-first list, not a filtering
   // dashboard, and every read is scoped to the signed-in user.
@@ -72,6 +77,22 @@ describe("non-goal guard", () => {
       for (const { pattern, label } of PARADIGM) {
         expect(pattern.test(code), `${label} found in ${file}`).toBe(false);
       }
+    });
+  }
+
+  // The service worker and offline shell live outside the scanned src ROOTS, so
+  // they need an explicit check to prove "no push, no notification, no timer
+  // anywhere". The worker caches the shell and nothing more.
+  const PUBLIC_MARKER =
+    /PushManager|pushManager|showNotification|Notification|web-?push|setInterval|\bcron\b/i;
+  for (const rel of ["public/sw.js", "public/offline.html"]) {
+    const path = join(process.cwd(), rel);
+    if (!existsSync(path)) continue;
+    it(`keeps the shell free of push, notification, and timers: ${rel}`, () => {
+      const raw = readFileSync(path, "utf8");
+      expect(PUBLIC_MARKER.test(raw), `push/notification/timer marker found in ${rel}`).toBe(
+        false,
+      );
     });
   }
 });

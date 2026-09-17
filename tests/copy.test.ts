@@ -11,7 +11,11 @@ const ROOTS = [
   "src/lib/seed.ts",
   "src/lib/display.ts",
   "src/lib/reconstruction.ts",
+  "src/lib/covenant.ts",
 ];
+
+// Static shell strings ship to users like any UI copy, so they are swept too.
+const STATIC_COPY = ["public/offline.html", "public/manifest.webmanifest"];
 
 const BANNED_WORDS = [
   "seamlessly", "effortlessly", "unlock", "elevate", "empower", "leverage",
@@ -35,17 +39,26 @@ describe("copy sweep", () => {
     expect(files.length).toBeGreaterThan(5);
   });
 
+  function assertClean(text: string): void {
+    const lower = text.toLowerCase();
+    expect(text, "em-dash or en-dash").not.toMatch(/[—–]/);
+    for (const word of BANNED_WORDS) {
+      expect(lower, `banned vocabulary: ${word}`).not.toContain(word);
+    }
+    for (const phrase of NEGATIVE_PHRASES) {
+      expect(lower, `negative phrasing: ${phrase}`).not.toContain(phrase);
+    }
+  }
+
   for (const file of files) {
     it(`is clean: ${file}`, () => {
-      const text = readFileSync(file, "utf8");
-      const lower = text.toLowerCase();
-      expect(text, "em-dash or en-dash").not.toMatch(/[—–]/);
-      for (const word of BANNED_WORDS) {
-        expect(lower, `banned vocabulary: ${word}`).not.toContain(word);
-      }
-      for (const phrase of NEGATIVE_PHRASES) {
-        expect(lower, `negative phrasing: ${phrase}`).not.toContain(phrase);
-      }
+      assertClean(readFileSync(file, "utf8"));
+    });
+  }
+
+  for (const file of STATIC_COPY) {
+    it(`is clean: ${file}`, () => {
+      assertClean(readFileSync(file, "utf8"));
     });
   }
 });

@@ -36,6 +36,11 @@ test.describe("mobile home", () => {
 
     await sheet.getByRole("button", { name: "A few days ago" }).click();
 
+    // A brand-new user finishes the guided first run at its success state,
+    // then lands on the normal home with the open flare.
+    await expect(page.getByText("That is your first flare")).toBeVisible();
+    await page.getByRole("button", { name: "Done" }).click();
+
     await expect(page.getByText("Flare in progress")).toBeVisible();
     await expect(page.getByText(/^Started around /)).toBeVisible();
 
