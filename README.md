@@ -13,8 +13,24 @@ duration, peak severity, and key treatments at a glance. You can carry the
 record out the door three ways: download it as JSON, download it as a
 spreadsheet-ready CSV, or print a clean one-document view. Before a doctor
 visit, the app drafts a one-page timeline of the flares since your last
-appointment for you to correct and print. The guided first run arrives in a
-later milestone.
+appointment for you to correct and print. A brand-new user is walked to their
+first logged flare with a short guided path, and the app installs to your home
+screen.
+
+## First run, install, and the one gentle check
+
+- **Guided first run.** A brand-new account lands on a two-step path: start a
+  flare, then say when it began. It points at the real controls, ticks itself
+  off as you go, and is skippable at any step. It appears only until your first
+  flare exists and never again.
+- **Add to your home screen.** After your first flare, the app offers to
+  install as a home-screen app. It works offline for the shell: open it with no
+  connection and it explains that your record is safe and to reconnect. Logging
+  a flare still needs the network.
+- **The one gentle check.** If a flare stays open more than two weeks, the home
+  screen asks once, "Is this flare still going?", so a forgotten flare does not
+  quietly distort your record. It is asked only when you open the app, only
+  once per flare, and never on a timer.
 
 ## Before your visit: the one-pager
 
@@ -114,8 +130,11 @@ values from the environment.
   onset and interview date math, validation, serialization, hedged display
   text, the CSV and export builders, and the demo seed.
 - `src/components` holds the client components (the flare button, the onset
-  sheet, the end-of-flare interview, the flare editor, the ledger pager, and
-  the export actions).
+  sheet, the end-of-flare interview, the flare editor, the ledger pager, the
+  export actions, the guided first run, the install prompt, and the covenant
+  nudge).
+- `public` holds the PWA manifest, the hand-written service worker, the offline
+  page, and the app icons.
 - `prisma/schema.prisma` and `prisma/migrations` define the database. Schema
   changes are forward-only migrations.
 - `tests` holds the Vitest suites and `e2e` holds the Playwright specs.
