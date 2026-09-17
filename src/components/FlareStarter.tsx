@@ -4,7 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import OnsetSheet from "./OnsetSheet";
 
-export default function FlareStarter({ label = "Start a flare" }: { label?: string }) {
+type Props = {
+  label?: string;
+  // Called once the create resolves and the onset sheet is ready. Lets a guide
+  // advance to its "say when it began" step.
+  onStarted?: () => void;
+  // Called instead of the default refresh after the first onset is saved, so a
+  // caller can own what happens next. With no prop, behavior is unchanged.
+  onSaved?: () => void;
+};
+
+export default function FlareStarter({ label = "Start a flare", onStarted, onSaved }: Props) {
   const router = useRouter();
   const [starting, setStarting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -24,6 +34,7 @@ export default function FlareStarter({ label = "Start a flare" }: { label?: stri
       if (res.ok) {
         const data = await res.json();
         setFlareId(data.flare.id);
+        onStarted?.();
       } else {
         setSheetOpen(false);
         const data = await res.json().catch(() => null);
@@ -39,7 +50,11 @@ export default function FlareStarter({ label = "Start a flare" }: { label?: stri
 
   function saved() {
     setSheetOpen(false);
-    router.refresh();
+    if (onSaved) {
+      onSaved();
+    } else {
+      router.refresh();
+    }
   }
 
   return (

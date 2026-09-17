@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import { umamiConfig } from "@/lib/observability";
 import "./globals.css";
 
@@ -7,6 +8,8 @@ export const metadata: Metadata = {
   title: "Flare Ledger",
   description:
     "Log a flare in seconds. Build a record your doctor can read, without daily check-ins.",
+  manifest: "/manifest.webmanifest",
+  icons: { apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
@@ -25,6 +28,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
+        <ServiceWorkerRegister />
         {umami ? (
           <Script
             src={umami.url}

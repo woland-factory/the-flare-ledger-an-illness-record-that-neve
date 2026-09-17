@@ -377,6 +377,53 @@ textarea.input {
   margin: 0 0 8px;
 }
 
+/* Guided first run */
+.firstrun-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.firstrun-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.firstrun-steps li::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  flex: none;
+}
+
+.firstrun-steps li.is-done {
+  color: var(--ink-soft);
+}
+
+.firstrun-steps li.is-done::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* A ring on the real primary control while the guide points at it. Not
+   color-only: it is a distinct outline ring around the button. */
+.firstrun-target .btn-primary {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 5px var(--accent);
+}
+
+/* Covenant nudge and install banner */
+.install-copy {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
 /* Pre-appointment timeline */
 .headline {
   font-size: 20px;
